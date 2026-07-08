@@ -1,0 +1,38 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Local environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE and editor folders
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+
+# Vite, Next.js and other tool caches
+.vite/
+.next/
+
+# Misc
+*.pem
+*.sublime-workspace
+*.sublime-project
