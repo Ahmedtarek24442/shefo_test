@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Search, Plus, Phone, MapPin, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
+import api from "../../services/api";
 
 const initialCustomers = [
   { id: "C001", name: "شركة الفهد التجارية", contact: "عبدالله الفهد", phone: "٠٥٠-١٢٣-٤٥٦٧", city: "الرياض", orders: 45, revenue: "٤٥٠,٠٠٠", lastOrder: "٢٥/٠٦/٢٠٢٤", status: "نشط" },
@@ -19,35 +20,60 @@ const emptyForm = { name: "", contact: "", phone: "", email: "", city: "", addre
 
 export function Customers() {
   const navigate = useNavigate();
-  const [customers, setCustomers] = useState(initialCustomers);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/clients');
+      setCustomers(res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("حدث خطأ أثناء تحميل العملاء");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const filtered = customers.filter(
-    (c) => c.name.includes(search) || c.contact.includes(search) || c.city.includes(search)
+    (c: any) => c.companyName?.includes(search) || c.address?.includes(search) || c.phone?.includes(search)
   );
 
-  const handleSave = () => {
-    if (!form.name || !form.contact || !form.phone) {
-      toast.error("يرجى تعبئة الحقول المطلوبة (الاسم، جهة الاتصال، الهاتف)");
+  const handleSave = async () => {
+    if (!form.name || !form.phone) {
+      toast.error("يرجى تعبئة الحقول المطلوبة (الاسم، الهاتف)");
       return;
     }
     setSaving(true);
-    setTimeout(() => {
-      const newId = `C${String(customers.length + 1).padStart(3, "0")}`;
-      setCustomers((prev) => [
-        ...prev,
-        { id: newId, name: form.name, contact: form.contact, phone: form.phone, city: form.city, orders: 0, revenue: "٠", lastOrder: "—", status: "نشط" },
-      ]);
-      setSaving(false);
+    try {
+      await api.post('/clients', {
+        companyName: form.name,
+        phone: form.phone,
+        email: form.email || null,
+        address: form.address || form.city || null,
+        taxNumber: form.taxNo || null,
+        creditLimit: form.creditLimit ? parseFloat(form.creditLimit) : null,
+      });
       setShowModal(false);
       setForm(emptyForm);
       toast.success(`تمت إضافة العميل "${form.name}" بنجاح`);
-    }, 700);
+      fetchCustomers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "حدث خطأ أثناء حفظ العميل");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -70,9 +96,8 @@ export function Customers() {
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: "إجمالي العملاء", value: customers.length, color: "text-[#2563EB]", bg: "bg-blue-50" },
-          { label: "عملاء نشطون", value: customers.filter((c) => c.status === "نشط").length, color: "text-green-600", bg: "bg-green-50" },
-          { label: "عملاء متأخرون", value: customers.filter((c) => c.status === "متأخر").length, color: "text-red-600", bg: "bg-red-50" },
-          { label: "إجمالي الإيرادات", value: "٢.٠٤ مليون ريال", color: "text-purple-600", bg: "bg-purple-50" },
+          { label: "عملاء نشطون", value: customers.filter((c: any) => c._count?.orders > 0).length, color: "text-green-600", bg: "bg-green-50" },
+          { label: "إجمالي الطلبات", value: customers.reduce((sum, c) => sum + (c._count?.orders || 0), 0), color: "text-purple-600", bg: "bg-purple-50" },
         ].map((s) => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-100`}>
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -106,15 +131,15 @@ export function Customers() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c) => (
+            {filtered.map((c: any) => (
               <tr
                 key={c.id}
                 className="border-b border-slate-50 hover:bg-blue-50/30 cursor-pointer transition-colors"
                 onClick={() => navigate(`/customers/${c.id}`)}
               >
                 <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{c.id}</td>
-                <td className="py-3 px-4 font-semibold text-slate-800">{c.name}</td>
-                <td className="py-3 px-4 text-slate-600">{c.contact}</td>
+                <td className="py-3 px-4 font-semibold text-slate-800">{c.companyName}</td>
+                <td className="py-3 px-4 text-slate-600">{c.responsible?.name || "-"}</td>
                 <td className="py-3 px-4 text-slate-500 text-xs font-mono">
                   <div className="flex items-center gap-1">
                     <Phone className="w-3 h-3" />
@@ -124,18 +149,17 @@ export function Customers() {
                 <td className="py-3 px-4 text-slate-600">
                   <div className="flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-slate-400" />
-                    {c.city}
+                    {c.address || "-"}
                   </div>
                 </td>
-                <td className="py-3 px-4 font-semibold text-slate-800">{c.orders}</td>
-                <td className="py-3 px-4 text-green-600 font-semibold text-xs">{c.revenue} ريال</td>
-                <td className="py-3 px-4 text-slate-500 text-xs">{c.lastOrder}</td>
+                <td className="py-3 px-4 font-semibold text-slate-800">{c._count?.orders || 0}</td>
+                <td className="py-3 px-4 text-green-600 font-semibold text-xs">-</td>
+                <td className="py-3 px-4 text-slate-500 text-xs">-</td>
                 <td className="py-3 px-4">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                    c.status === "نشط" ? "bg-green-100 text-green-700 border-green-200" :
-                    c.status === "متأخر" ? "bg-red-100 text-red-700 border-red-200" :
+                    c._count?.orders > 0 ? "bg-green-100 text-green-700 border-green-200" :
                     "bg-slate-100 text-slate-500 border-slate-200"
-                  }`}>{c.status}</span>
+                  }`}>{c._count?.orders > 0 ? "نشط" : "جديد"}</span>
                 </td>
                 <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                   <button
@@ -158,8 +182,8 @@ export function Customers() {
             <FormField label="اسم الشركة" required>
               <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: شركة النجاح التجارية" className={inputCls} />
             </FormField>
-            <FormField label="جهة الاتصال" required>
-              <input value={form.contact} onChange={(e) => set("contact", e.target.value)} placeholder="اسم المسؤول" className={inputCls} />
+            <FormField label="الاسم / جهة الاتصال">
+              <input value={form.contact} onChange={(e) => set("contact", e.target.value)} placeholder="اسم المسؤول (اختياري)" className={inputCls} />
             </FormField>
             <FormField label="رقم الهاتف" required>
               <input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="٠٥٠-XXX-XXXX" className={inputCls} />

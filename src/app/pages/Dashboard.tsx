@@ -1,21 +1,30 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import {
   Users, ClipboardList, AlertCircle, TrendingUp, DollarSign, Clock,
-  ArrowUpRight, ArrowDownRight, Package, CheckCircle2,
+  ArrowUpRight, ArrowDownRight, Package, CheckCircle2, Factory,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
+import api from "../../services/api";
 
-const kpis = [
-  { label: "عدد العملاء", value: "٢٤٨", sub: "+١٢ هذا الشهر", icon: Users, color: "#2563EB", bg: "#EFF6FF", trend: "up" },
-  { label: "الطلبات الجارية", value: "٨٦", sub: "في مراحل الإنتاج", icon: ClipboardList, color: "#F59E0B", bg: "#FFFBEB", trend: "up" },
-  { label: "طلبات اليوم", value: "١٤", sub: "+٣ من أمس", icon: Clock, color: "#8B5CF6", bg: "#F5F3FF", trend: "up" },
-  { label: "طلبات متأخرة", value: "١٢", sub: "تحتاج متابعة عاجلة", icon: AlertCircle, color: "#DC2626", bg: "#FEF2F2", trend: "down" },
-  { label: "الإيرادات (يونيو)", value: "٢٤٠ ألف", sub: "+١٨٪ من الشهر السابق", icon: TrendingUp, color: "#16A34A", bg: "#F0FDF4", trend: "up" },
-  { label: "الأرباح (يونيو)", value: "٦٨ ألف", sub: "+١٥٪ من الشهر السابق", icon: DollarSign, color: "#0891B2", bg: "#ECFEFF", trend: "up" },
-];
+const statusStyle: Record<string, string> = {
+  "DESIGN": "bg-purple-100 text-purple-700",
+  "PRINTING": "bg-yellow-100 text-yellow-700",
+  "DIE_CUTTING": "bg-orange-100 text-orange-700",
+  "PACKAGING": "bg-blue-100 text-blue-700",
+  "DELIVERY": "bg-green-100 text-green-700",
+};
+
+const stageNames: Record<string, string> = {
+  "DESIGN": "قيد التصميم",
+  "PRINTING": "قيد الطباعة",
+  "DIE_CUTTING": "الداي كت",
+  "PACKAGING": "اللصق والتعبئة",
+  "DELIVERY": "مكتمل",
+};
 
 const monthlySales = [
   { month: "يناير", sales: 185, profit: 42 },
@@ -26,46 +35,48 @@ const monthlySales = [
   { month: "يونيو", sales: 240, profit: 68 },
 ];
 
-const ordersByStatus = [
-  { name: "قيد التصميم", value: 14, color: "#8B5CF6" },
-  { name: "قيد الطباعة", value: 18, color: "#F59E0B" },
-  { name: "الداي كت", value: 11, color: "#F97316" },
-  { name: "اللصق والتعبئة", value: 22, color: "#2563EB" },
-  { name: "مكتمل", value: 120, color: "#16A34A" },
-  { name: "متأخر", value: 12, color: "#DC2626" },
-];
-
-const topProducts = [
-  { name: "صندوق ٤٠×٣٠×٢٠", orders: 312 },
-  { name: "كرتون مزدوج مطبوع", orders: 248 },
-  { name: "علب هدايا فاخرة", orders: 189 },
-  { name: "صندوق شحن دولي", orders: 156 },
-  { name: "كرتون مقوى بداي كت", orders: 134 },
-];
-
-const latestOrders = [
-  { id: "WO-2024-0086", customer: "شركة الفهد التجارية", product: "صندوق ٤٠×٣٠×٢٠", qty: "٥٠٠٠", stage: "الطباعة", status: "جاري", date: "٢٥ يونيو" },
-  { id: "WO-2024-0085", customer: "مؤسسة النور للتغليف", product: "كرتون مطبوع بالألوان", qty: "٣٠٠٠", stage: "التسليم", status: "مكتمل", date: "٢٤ يونيو" },
-  { id: "WO-2024-0084", customer: "شركة الأمل الصناعية", product: "كرتون مقوى مزدوج", qty: "٧٠٠٠", stage: "الداي كت", status: "جاري", date: "٢٤ يونيو" },
-  { id: "WO-2024-0083", customer: "مصنع الجودة", product: "علب هدايا فاخرة", qty: "٢٠٠٠", stage: "أمر توريد", status: "متأخر", date: "٢٣ يونيو" },
-  { id: "WO-2024-0082", customer: "شركة التميز", product: "صندوق شحن دولي", qty: "٤٥٠٠", stage: "اللصق", status: "جاري", date: "٢٣ يونيو" },
-];
-
-const statusStyle: Record<string, string> = {
-  "جاري": "bg-blue-100 text-blue-700",
-  "مكتمل": "bg-green-100 text-green-700",
-  "متأخر": "bg-red-100 text-red-700",
-};
-
 export function Dashboard() {
   const navigate = useNavigate();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const response = await api.get('/dashboard');
+        setData(response.data);
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading || !data) return <div className="p-8 text-center" dir="rtl">جاري التحميل...</div>;
+
+  const kpis = [
+    { label: "عدد العملاء", value: data.totalClients, sub: "إجمالي العملاء", icon: Users, color: "#2563EB", bg: "#EFF6FF", trend: "up" },
+    { label: "الطلبات الجارية", value: data.ordersInProgress, sub: "في مراحل الإنتاج", icon: ClipboardList, color: "#F59E0B", bg: "#FFFBEB", trend: "up" },
+    { label: "أوامر التوريد", value: data.supplierOrders, sub: "إجمالي الأوامر للموردين", icon: Clock, color: "#8B5CF6", bg: "#F5F3FF", trend: "up" },
+    { label: "إجمالي الطلبات", value: data.totalOrders, sub: "كل الطلبات", icon: Factory, color: "#DC2626", bg: "#FEF2F2", trend: "up" },
+    { label: "قيمة المخزون", value: `${data.inventoryValue} ر.س`, sub: "إجمالي قيمة الخامات", icon: TrendingUp, color: "#16A34A", bg: "#F0FDF4", trend: "up" },
+    { label: "المنتجات / الخامات", value: `${data.products} / ${data.materials}`, sub: "أنواع المنتجات والخامات", icon: Package, color: "#0891B2", bg: "#ECFEFF", trend: "up" },
+  ];
+
+  const pieData = Object.entries(data.ordersByStage || {}).map(([stage, count]) => {
+    const colors = ["#8B5CF6", "#F59E0B", "#F97316", "#2563EB", "#16A34A"];
+    const idx = Object.keys(data.ordersByStage).indexOf(stage);
+    return { name: stageNames[stage] || stage, value: count, color: colors[idx % colors.length] };
+  }).filter((item: any) => item.value > 0);
 
   return (
     <div className="space-y-6" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">لوحة التحكم</h1>
-          <p className="text-slate-500 text-sm mt-0.5">الأربعاء، ٢٥ يونيو ٢٠٢٤</p>
+          <p className="text-slate-500 text-sm mt-0.5">{new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <button
           onClick={() => navigate("/work-orders")}
@@ -133,14 +144,14 @@ export function Dashboard() {
           <h3 className="font-bold text-slate-800 mb-4">الطلبات حسب المرحلة</h3>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={ordersByStatus} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>
-                {ordersByStatus.map((e, i) => <Cell key={i} fill={e.color} />)}
+              <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>
+                {pieData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
               </Pie>
               <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-1.5 mt-3">
-            {ordersByStatus.map((s) => (
+            {pieData.map((s: any) => (
               <div key={s.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
@@ -173,23 +184,31 @@ export function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {latestOrders.map((o) => (
+                {data.recentOrders?.map((o: any) => (
                   <tr
                     key={o.id}
                     className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => navigate(`/work-orders/${o.id}`)}
                   >
                     <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-semibold">{o.id}</td>
-                    <td className="py-3 px-4 text-slate-700">{o.customer}</td>
-                    <td className="py-3 px-4 text-slate-600 text-xs">{o.product}</td>
-                    <td className="py-3 px-4 text-slate-700">{o.qty}</td>
-                    <td className="py-3 px-4">
-                      <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{o.stage}</span>
+                    <td className="py-3 px-4 text-slate-700">{o.client?.companyName}</td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">
+                      {o.items?.map((item: any) => item.product?.name).join(" و ")}
+                    </td>
+                    <td className="py-3 px-4 text-slate-700">
+                      {o.items?.reduce((sum: number, item: any) => sum + item.quantity, 0)}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStyle[o.status]}`}>{o.status}</span>
+                      <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">
+                        {stageNames[o.currentStage] || o.currentStage}
+                      </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 text-xs">{o.date}</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStyle[o.currentStage] || ''}`}>
+                        {stageNames[o.currentStage] || o.currentStage}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">{new Date(o.stageHistory?.[0]?.createdAt || Date.now()).toLocaleDateString('ar-SA')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -201,22 +220,14 @@ export function Dashboard() {
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
           <h3 className="font-bold text-slate-800 mb-4">الأكثر طلباً</h3>
           <div className="space-y-3">
-            {topProducts.map((p, i) => (
-              <div key={p.name} className="flex items-center gap-3">
+            {data.recentSupplierOrders?.map((so: any, i: number) => (
+              <div key={so.id} className="flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs flex items-center justify-center font-semibold shrink-0">
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-700 truncate">{p.name}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#2563EB] rounded-full"
-                        style={{ width: `${(p.orders / 312) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-500 shrink-0">{p.orders}</span>
-                  </div>
+                  <p className="text-sm text-slate-700 truncate">أمر توريد #{so.id} - {so.suplier?.name}</p>
+                  <p className="text-xs text-slate-500">{new Date(so.createdAt).toLocaleDateString('ar-SA')}</p>
                 </div>
               </div>
             ))}
@@ -225,13 +236,9 @@ export function Dashboard() {
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center gap-2 text-sm">
               <Package className="w-4 h-4 text-[#F59E0B]" />
-              <span className="text-slate-600">إجمالي المنتجات في المخزون</span>
+              <span className="text-slate-600">إجمالي المنتجات</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800 mt-1">١٢٤ صنف</p>
-            <div className="flex items-center gap-1 mt-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-              <span className="text-xs text-green-600">١١٢ بمخزون كافٍ</span>
-            </div>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{data.products} صنف</p>
           </div>
         </div>
       </div>

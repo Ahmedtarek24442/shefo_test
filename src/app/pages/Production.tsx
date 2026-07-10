@@ -1,14 +1,8 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Factory, Clock, CheckCircle2, AlertCircle, Eye } from "lucide-react";
-
-const productionQueue = [
-  { id: "WO-2024-0086", product: "صندوق ٤٠×٣٠×٢٠", customer: "شركة الفهد", stage: "الطباعة", stageIdx: 2, employee: "خالد إبراهيم", machine: "هايدلبرج SM-٧٤", since: "٤ ساعات", priority: "عالية", qty: 5000 },
-  { id: "WO-2024-0084", product: "كرتون مقوى مزدوج", customer: "الأمل الصناعية", stage: "الداي كت", stageIdx: 3, employee: "سامي العتيبي", machine: "ماكينة كسر-٠٣", since: "٢ ساعة", priority: "متوسطة", qty: 7000 },
-  { id: "WO-2024-0079", product: "صندوق عرض بداي كت", customer: "شركة الفهد", stage: "التعبئة", stageIdx: 6, employee: "عمال التعبئة", machine: "خط التعبئة-٠١", since: "١ ساعة", priority: "متوسطة", qty: 3500 },
-  { id: "WO-2024-0082", product: "صندوق شحن دولي", customer: "شركة التميز", stage: "اللصق", stageIdx: 5, employee: "محمد الزهراني", machine: "ماكينة لصق-٠٢", since: "٣ ساعات", priority: "عالية", qty: 4500 },
-  { id: "WO-2024-0081", product: "علب أغذية مبردة", customer: "الريادة للأغذية", stage: "البرنز", stageIdx: 4, employee: "فارس القحطاني", machine: "ماكينة برونز-٠١", since: "٥ ساعات", priority: "منخفضة", qty: 10000 },
-  { id: "WO-2024-0080", product: "صندوق تصدير مقوى", customer: "الخليج للتصدير", stage: "التصميم", stageIdx: 1, employee: "سارة أحمد", machine: "—", since: "١ يوم", priority: "متوسطة", qty: 1500 },
-];
+import { toast } from "sonner";
+import api from "../../services/api";
 
 const machines = [
   { name: "هايدلبرج SM-٧٤", type: "طباعة", status: "شغال", order: "WO-2024-0086", load: 85 },
@@ -20,31 +14,40 @@ const machines = [
   { name: "ماكينة كسر-٠١", type: "داي كت", status: "متوقف", order: "—", load: 0 },
 ];
 
-const stageColors = [
-  "bg-slate-100 text-slate-600",
-  "bg-purple-100 text-purple-700",
-  "bg-orange-100 text-orange-700",
-  "bg-yellow-100 text-yellow-700",
-  "bg-pink-100 text-pink-700",
-  "bg-cyan-100 text-cyan-700",
-  "bg-indigo-100 text-indigo-700",
-  "bg-green-100 text-green-700",
-];
-
-const priorityStyle: Record<string, string> = {
-  "عالية": "bg-red-100 text-red-700 border-red-200",
-  "متوسطة": "bg-yellow-100 text-yellow-700 border-yellow-200",
-  "منخفضة": "bg-green-100 text-green-700 border-green-200",
+const stageNames: Record<string, string> = {
+  "DESIGN": "قيد التصميم",
+  "PRINTING": "الطباعة",
+  "DIE_CUTTING": "الداي كت",
+  "PACKAGING": "التعبئة",
+  "DELIVERY": "التسليم",
 };
 
-const machineStatus: Record<string, { bg: string; dot: string }> = {
-  "شغال": { bg: "bg-green-50 border-green-200", dot: "bg-green-500" },
-  "صيانة": { bg: "bg-yellow-50 border-yellow-200", dot: "bg-yellow-400" },
-  "متوقف": { bg: "bg-slate-50 border-slate-200", dot: "bg-slate-400" },
+const stageColors: Record<string, string> = {
+  "DESIGN": "bg-purple-100 text-purple-700",
+  "PRINTING": "bg-yellow-100 text-yellow-700",
+  "DIE_CUTTING": "bg-orange-100 text-orange-700",
+  "PACKAGING": "bg-blue-100 text-blue-700",
+  "DELIVERY": "bg-green-100 text-green-700",
 };
 
 export function Production() {
   const navigate = useNavigate();
+  const [productionQueue, setProductionQueue] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProduction = async () => {
+      try {
+        const res = await api.get('/orders?stage=in_progress');
+        setProductionQueue(res.data);
+      } catch (err) {
+        toast.error("حدث خطأ أثناء تحميل بيانات الإنتاج");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProduction();
+  }, []);
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -97,31 +100,35 @@ export function Production() {
               </tr>
             </thead>
             <tbody>
-              {productionQueue.map((item) => (
-                <tr key={item.id} className="border-b border-slate-50 hover:bg-blue-50/20 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/work-orders/${item.id}`)}>
-                  <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{item.id}</td>
-                  <td className="py-3 px-4 font-medium text-slate-800 text-xs">{item.product}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{item.customer}</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColors[item.stageIdx]}`}>{item.stage}</span>
-                  </td>
-                  <td className="py-3 px-4 text-slate-600 text-xs">{item.employee}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{item.machine}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{item.since}</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${priorityStyle[item.priority]}`}>{item.priority}</span>
-                  </td>
-                  <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => navigate(`/work-orders/${item.id}`)}
-                      className="text-xs text-[#2563EB] flex items-center gap-1 hover:text-[#1E40AF]"
-                    >
-                      <Eye className="w-3 h-3" /> عرض
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {productionQueue.map((item) => {
+                const product = item.items?.[0]?.product;
+                const employee = item.stageHistory?.[0]?.responsible?.name || "—";
+                return (
+                  <tr key={item.id} className="border-b border-slate-50 hover:bg-blue-50/20 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/work-orders/${item.id}`)}>
+                    <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{item.id}</td>
+                    <td className="py-3 px-4 font-medium text-slate-800 text-xs">{product?.name || "—"}</td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">{item.client?.companyName}</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColors[item.currentStage] || 'bg-slate-100'}`}>{stageNames[item.currentStage] || item.currentStage}</span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">{employee}</td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">—</td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">{new Date(item.createdAt || Date.now()).toLocaleDateString("ar-SA")}</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium bg-yellow-100 text-yellow-700 border-yellow-200`}>متوسطة</span>
+                    </td>
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => navigate(`/work-orders/${item.id}`)}
+                        className="text-xs text-[#2563EB] flex items-center gap-1 hover:text-[#1E40AF]"
+                      >
+                        <Eye className="w-3 h-3" /> عرض
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

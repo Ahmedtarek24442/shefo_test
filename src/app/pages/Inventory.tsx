@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, TrendingUp, TrendingDown, AlertTriangle, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
+import api from "../../services/api";
 
 const initialStock = [
   { id: "INV001", name: "صندوق كرتون ٤٠×٣٠×٢٠", category: "صناديق قياسية", inStock: 12500, reserved: 5000, available: 7500, unit: "قطعة", minStock: 2000 },
@@ -35,15 +36,33 @@ const emptyAdj = { item: "", type: "وارد", qty: "", reason: "", ref: "" };
 
 export function Inventory() {
   const [tab, setTab] = useState<"stock" | "movements">("stock");
-  const [stockItems, setStockItems] = useState(initialStock);
+  const [stockItems, setStockItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [movements, setMovements] = useState(initialMovements);
   const [showModal, setShowModal] = useState(false);
   const [adj, setAdj] = useState(emptyAdj);
   const [saving, setSaving] = useState(false);
 
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/inventory');
+      setStockItems(res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("حدث خطأ أثناء تحميل المخزون");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
   const setA = (k: string, v: string) => setAdj((p) => ({ ...p, [k]: v }));
 
-  const lowStock = stockItems.filter((i) => i.available <= i.minStock).length;
+  const lowStock = stockItems.filter((i: any) => i.currentAmount <= i.minimumAllowedAmount).length;
 
   const handleAdjust = () => {
     if (!adj.item || !adj.qty) {
@@ -62,8 +81,8 @@ export function Inventory() {
         prev.map((item) => {
           if (item.name !== adj.item) return item;
           const delta = adj.type === "وارد" ? qty : -qty;
-          const newAvail = Math.max(0, item.available + delta);
-          return { ...item, available: newAvail, inStock: Math.max(0, item.inStock + delta) };
+          const newAvail = Math.max(0, item.currentAmount + delta);
+          return { ...item, currentAmount: newAvail };
         })
       );
       setSaving(false);
@@ -149,25 +168,25 @@ export function Inventory() {
               </tr>
             </thead>
             <tbody>
-              {stockItems.map((item) => {
-                const isLow = item.available <= item.minStock;
-                const pct = Math.min(100, (item.available / item.inStock) * 100);
+              {stockItems.map((item: any) => {
+                const isLow = item.currentAmount <= item.minimumAllowedAmount;
+                const pct = item.minimumAllowedAmount > 0 ? Math.min(100, (item.currentAmount / (item.minimumAllowedAmount * 3)) * 100) : 100;
                 return (
                   <tr key={item.id} className={`border-b border-slate-50 hover:bg-slate-50/50 ${isLow ? "bg-red-50/20" : ""}`}>
                     <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{item.id}</td>
                     <td className="py-3 px-4 font-semibold text-slate-800">{item.name}</td>
-                    <td className="py-3 px-4 text-xs text-slate-500">{item.category}</td>
-                    <td className="py-3 px-4 text-slate-700">{item.inStock.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-orange-600">{item.reserved.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-xs text-slate-500">{item.type}</td>
+                    <td className="py-3 px-4 text-slate-700">{item.currentAmount.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-orange-600">0</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <span className={`font-bold ${isLow ? "text-red-600" : "text-green-600"}`}>{item.available.toLocaleString()}</span>
+                        <span className={`font-bold ${isLow ? "text-red-600" : "text-green-600"}`}>{item.currentAmount.toLocaleString()}</span>
                         <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${pct < 30 ? "bg-red-400" : pct < 60 ? "bg-yellow-400" : "bg-green-400"}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 text-xs">{item.minStock.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">{item.minimumAllowedAmount.toLocaleString()}</td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
                         isLow ? "bg-red-100 text-red-700 border-red-200" : "bg-green-100 text-green-700 border-green-200"

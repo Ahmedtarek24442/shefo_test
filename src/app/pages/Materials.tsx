@@ -1,20 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
-
-const initialMaterials = [
-  { id: "M001", name: "ورق كرافت بني", type: "ورق", unit: "طن", qty: 45.5, minQty: 10, price: 3200, supplier: "شركة الورق السعودية", lastPurchase: "١٨/٠٦/٢٠٢٤" },
-  { id: "M002", name: "ورق فلوت مموج", type: "ورق", unit: "طن", qty: 32.0, minQty: 8, price: 2800, supplier: "مصنع الورق الوطني", lastPurchase: "١٥/٠٦/٢٠٢٤" },
-  { id: "M003", name: "غراء الكرتون الصناعي", type: "مواد لاصقة", unit: "كجم", qty: 580, minQty: 200, price: 45, supplier: "شركة الكيماويات المتحدة", lastPurchase: "٢٠/٠٦/٢٠٢٤" },
-  { id: "M004", name: "حبر طباعة أزرق", type: "أحبار", unit: "كجم", qty: 28, minQty: 50, price: 180, supplier: "شركة الطباعة الخليجية", lastPurchase: "١٢/٠٦/٢٠٢٤" },
-  { id: "M005", name: "حبر طباعة أحمر", type: "أحبار", unit: "كجم", qty: 35, minQty: 50, price: 180, supplier: "شركة الطباعة الخليجية", lastPurchase: "١٢/٠٦/٢٠٢٤" },
-  { id: "M006", name: "حبر طباعة أصفر", type: "أحبار", unit: "كجم", qty: 42, minQty: 50, price: 175, supplier: "شركة الطباعة الخليجية", lastPurchase: "١٢/٠٦/٢٠٢٤" },
-  { id: "M007", name: "شريط تغليف شفاف", type: "مستلزمات", unit: "لفة", qty: 320, minQty: 100, price: 12, supplier: "مستودعات اللوازم", lastPurchase: "٢٢/٠٦/٢٠٢٤" },
-  { id: "M008", name: "بروفيل تثبيت زوايا", type: "مستلزمات", unit: "قطعة", qty: 4200, minQty: 2000, price: 0.8, supplier: "مستودعات اللوازم", lastPurchase: "١٩/٠٦/٢٠٢٤" },
-  { id: "M009", name: "ورق مقوى أبيض", type: "ورق", unit: "طن", qty: 6.5, minQty: 5, price: 4100, supplier: "مصنع الورق الوطني", lastPurchase: "١٠/٠٦/٢٠٢٤" },
-  { id: "M010", name: "مادة برونز ذهبي", type: "أحبار", unit: "كجم", qty: 8, minQty: 15, price: 420, supplier: "شركة المواد الخاصة", lastPurchase: "٠٨/٠٦/٢٠٢٤" },
-];
+import api from "../../services/api";
 
 const typeColors: Record<string, string> = {
   "ورق": "bg-blue-100 text-blue-700",
@@ -23,56 +11,76 @@ const typeColors: Record<string, string> = {
   "مستلزمات": "bg-slate-100 text-slate-600",
 };
 
-const suppliers = ["شركة الورق السعودية", "مصنع الورق الوطني", "شركة الكيماويات المتحدة", "شركة الطباعة الخليجية", "مستودعات اللوازم", "شركة المواد الخاصة"];
+const emptyForm = { name: "", type: "", unit: "", qty: "", minQty: "", price: "", supplierId: "" };
 
-const emptyForm = { name: "", type: "", unit: "", qty: "", minQty: "", price: "", supplier: "" };
 
 export function Materials() {
-  const [materials, setMaterials] = useState(initialMaterials);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("الكل");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [matRes, supRes] = await Promise.all([
+        api.get('/materials'),
+        api.get('/suppliers')
+      ]);
+      setMaterials(matRes.data);
+      setSuppliers(supRes.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("حدث خطأ أثناء تحميل البيانات");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const types = ["الكل", ...Array.from(new Set(materials.map((m) => m.type)))];
   const filtered = materials.filter((m) => {
-    const matchSearch = m.name.includes(search) || m.supplier.includes(search);
+    const matchSearch = m.name.includes(search) || m.suplier?.name?.includes(search);
     const matchType = typeFilter === "الكل" || m.type === typeFilter;
     return matchSearch && matchType;
   });
 
-  const lowStock = materials.filter((m) => m.qty <= m.minQty).length;
+  const lowStock = materials.filter((m) => m.currentAmount <= m.minimumAllowedAmount).length;
 
-  const handleSave = () => {
-    if (!form.name || !form.type || !form.unit) {
-      toast.error("يرجى تعبئة الحقول المطلوبة");
+  const handleSave = async () => {
+    if (!form.name || !form.type || !form.unit || !form.supplierId) {
+      toast.error("يرجى تعبئة الحقول المطلوبة (الاسم، النوع، الوحدة، المورد)");
       return;
     }
     setSaving(true);
-    setTimeout(() => {
-      const newId = `M${String(materials.length + 1).padStart(3, "0")}`;
-      setMaterials((prev) => [
-        ...prev,
-        {
-          id: newId,
-          name: form.name,
-          type: form.type,
-          unit: form.unit,
-          qty: parseFloat(form.qty) || 0,
-          minQty: parseFloat(form.minQty) || 0,
-          price: parseFloat(form.price) || 0,
-          supplier: form.supplier,
-          lastPurchase: "—",
-        },
-      ]);
-      setSaving(false);
+    try {
+      await api.post('/materials', {
+        name: form.name,
+        type: form.type,
+        unit: form.unit,
+        currentAmount: parseFloat(form.qty) || 0,
+        minimumAllowedAmount: parseFloat(form.minQty) || 0,
+        buyPrice: parseFloat(form.price) || 0,
+        supplierId: parseInt(form.supplierId),
+      });
       setShowModal(false);
       setForm(emptyForm);
       toast.success(`تمت إضافة الخامة "${form.name}" بنجاح`);
-    }, 700);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "حدث خطأ أثناء حفظ الخامة");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -103,9 +111,9 @@ export function Materials() {
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: "إجمالي الأصناف", value: materials.length, color: "text-[#2563EB]" },
-          { label: "مخزون كافٍ", value: materials.filter((m) => m.qty > m.minQty).length, color: "text-green-600" },
+          { label: "مخزون كافٍ", value: materials.filter((m) => m.currentAmount > m.minimumAllowedAmount).length, color: "text-green-600" },
           { label: "مخزون منخفض", value: lowStock, color: "text-red-600" },
-          { label: "قيمة المخزون التقديرية", value: "٢١٨,٤٠٠ ريال", color: "text-purple-600" },
+          { label: "قيمة المخزون التقديرية", value: `${materials.reduce((sum, m) => sum + (m.currentAmount * m.buyPrice), 0).toLocaleString()} ريال`, color: "text-purple-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -151,7 +159,7 @@ export function Materials() {
           </thead>
           <tbody>
             {filtered.map((m) => {
-              const isLow = m.qty <= m.minQty;
+              const isLow = m.currentAmount <= m.minimumAllowedAmount;
               return (
                 <tr key={m.id} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isLow ? "bg-red-50/30" : ""}`}>
                   <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{m.id}</td>
@@ -160,18 +168,18 @@ export function Materials() {
                     {m.name}
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[m.type]}`}>{m.type}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[m.type] || "bg-slate-100 text-slate-600"}`}>{m.type}</span>
                   </td>
                   <td className="py-3 px-4 text-slate-600 text-xs">{m.unit}</td>
                   <td className="py-3 px-4">
                     <span className={`font-bold text-sm ${isLow ? "text-red-600" : "text-slate-800"}`}>
-                      {m.qty} {m.unit}
+                      {m.currentAmount} {m.unit}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{m.minQty} {m.unit}</td>
-                  <td className="py-3 px-4 text-slate-700 font-medium">{m.price.toLocaleString()} ريال/{m.unit}</td>
-                  <td className="py-3 px-4 text-slate-600 text-xs">{m.supplier}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{m.lastPurchase}</td>
+                  <td className="py-3 px-4 text-slate-500 text-xs">{m.minimumAllowedAmount} {m.unit}</td>
+                  <td className="py-3 px-4 text-slate-700 font-medium">{m.buyPrice?.toLocaleString()} ريال/{m.unit}</td>
+                  <td className="py-3 px-4 text-slate-600 text-xs">{m.suplier?.name || "-"}</td>
+                  <td className="py-3 px-4 text-slate-500 text-xs">-</td>
                   <td className="py-3 px-4">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
                       isLow ? "bg-red-100 text-red-700 border-red-200" : "bg-green-100 text-green-700 border-green-200"
@@ -214,10 +222,10 @@ export function Materials() {
             <FormField label="سعر الشراء (ريال/وحدة)">
               <input value={form.price} onChange={(e) => set("price", e.target.value)} placeholder="0" className={inputCls} type="number" />
             </FormField>
-            <FormField label="المورد">
-              <select value={form.supplier} onChange={(e) => set("supplier", e.target.value)} className={selectCls}>
+            <FormField label="المورد" required>
+              <select value={form.supplierId} onChange={(e) => set("supplierId", e.target.value)} className={selectCls}>
                 <option value="">اختر المورد...</option>
-                {suppliers.map((s) => <option key={s}>{s}</option>)}
+                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </FormField>
           </div>

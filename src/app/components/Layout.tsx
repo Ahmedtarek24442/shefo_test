@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, useLocation } from "react-router";
+import { Outlet, useNavigate, useLocation, Navigate } from "react-router";
 import { Toaster } from "sonner";
 import {
   Home,
@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "./ui/utils";
+import { useAuth } from "../../context/AuthContext";
 
 const menuItems = [
   { icon: Home, label: "الرئيسية", path: "/" },
@@ -32,11 +33,20 @@ const menuItems = [
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#F1F5F9]">جاري التحميل...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F1F5F9]" dir="rtl">
@@ -85,12 +95,15 @@ export function Layout() {
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">أحمد محمد</p>
+              <p className="text-sm font-semibold truncate">{user?.name}</p>
               <p className="text-[11px] text-slate-400">مدير النظام</p>
             </div>
           </div>
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 text-sm transition-all"
           >
             <LogOut className="w-4 h-4" />

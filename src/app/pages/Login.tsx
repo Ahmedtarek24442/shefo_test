@@ -1,17 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Factory, Lock, User } from "lucide-react";
-import { toast } from "sonner";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../services/api";
 
 export function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const { login, isAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/");
+    try {
+      setIsLoading(true);
+      const res = await api.post('/auth/login', { phone: username, password });
+      login(res.data.access_token, res.data.user);
+      toast.success("تم تسجيل الدخول بنجاح");
+      navigate("/");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "فشل تسجيل الدخول. يرجى التحقق من بياناتك.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -97,9 +110,10 @@ export function Login() {
 
               <button
                 type="submit"
-                className="w-full h-11 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-lg font-semibold text-sm transition-colors shadow-lg shadow-blue-500/20"
+                disabled={isLoading}
+                className="w-full h-11 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-blue-300 text-white rounded-lg font-semibold text-sm transition-colors shadow-lg shadow-blue-500/20"
               >
-                تسجيل الدخول
+                {isLoading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
               </button>
             </form>
           </div>
