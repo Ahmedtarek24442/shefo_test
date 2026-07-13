@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, Plus, Phone, MapPin, Eye } from "lucide-react";
+import { Search, Plus, Phone, MapPin, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
 import api from "../../services/api";
@@ -162,12 +162,20 @@ export function Customers() {
                   }`}>{c._count?.orders > 0 ? "نشط" : "جديد"}</span>
                 </td>
                 <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => navigate(`/customers/${c.id}`)}
-                    className="flex items-center gap-1 text-xs text-[#2563EB] font-medium hover:text-[#1E40AF]"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> عرض
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/customers/${c.id}`)}
+                      className="flex items-center gap-1 text-xs text-[#2563EB] font-medium hover:text-[#1E40AF]"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> عرض
+                    </button>
+                    <button
+                      onClick={() => navigate(`/customers/${c.id}/account-statement`)}
+                      className="flex items-center gap-1 text-xs text-emerald-600 font-medium hover:text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 hover:bg-emerald-100 transition-all"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> كشف حساب
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -4,9 +4,12 @@ import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { Customers } from "./pages/Customers";
 import { CustomerDetails } from "./pages/CustomerDetails";
+import { AccountStatement } from "./pages/AccountStatement";
 import { WorkOrders } from "./pages/WorkOrders";
 import { OrderDetails } from "./pages/OrderDetails";
-import { Production } from "./pages/Production";
+import { Suppliers } from "./pages/Suppliers";
+import { SupplierDetails } from "./pages/SupplierDetails";
+import { SupplierOrders } from "./pages/SupplierOrders";
 import { Materials } from "./pages/Materials";
 import { Inventory } from "./pages/Inventory";
 import { Accounts } from "./pages/Accounts";
@@ -21,9 +24,12 @@ export const router = createBrowserRouter([
       { index: true, Component: Dashboard },
       { path: "customers", Component: Customers },
       { path: "customers/:id", Component: CustomerDetails },
+      { path: "customers/:id/account-statement", Component: AccountStatement },
       { path: "work-orders", Component: WorkOrders },
       { path: "work-orders/:id", Component: OrderDetails },
-      { path: "production", Component: Production },
+      { path: "suppliers", Component: Suppliers },
+      { path: "suppliers/:id", Component: SupplierDetails },
+      { path: "supplier-orders", Component: SupplierOrders },
       { path: "materials", Component: Materials },
       { path: "inventory", Component: Inventory },
       { path: "accounts", Component: Accounts },

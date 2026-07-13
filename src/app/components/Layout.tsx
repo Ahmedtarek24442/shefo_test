@@ -14,6 +14,7 @@ import {
   LogOut,
   Bell,
   Search,
+  Truck,
 } from "lucide-react";
 import { cn } from "./ui/utils";
 import { useAuth } from "../../context/AuthContext";
@@ -22,12 +23,14 @@ const menuItems = [
   { icon: Home, label: "الرئيسية", path: "/" },
   { icon: Users, label: "العملاء", path: "/customers" },
   { icon: ClipboardList, label: "أوامر التشغيل", path: "/work-orders" },
-  { icon: FactoryIcon, label: "الإنتاج", path: "/production" },
+  { icon: Truck, label: "الموردين", path: "/suppliers" },
+  { icon: Truck, label: "اومر التوريد", path: "/supplier-orders" },
   { icon: Layers, label: "الخامات", path: "/materials" },
   { icon: Package, label: "المخزون", path: "/inventory" },
   { icon: DollarSign, label: "الحسابات", path: "/accounts" },
   { icon: BarChart3, label: "التقارير", path: "/reports" },
   { icon: Settings, label: "الإعدادات", path: "/settings" },
+
 ];
 
 export function Layout() {

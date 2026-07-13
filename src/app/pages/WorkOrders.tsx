@@ -6,23 +6,23 @@ import { Modal, FormField, ModalFooter, inputCls, selectCls, textareaCls } from 
 import api from "../../services/api";
 
 const stageNames: Record<string, string> = {
-  "DESIGN": "قيد التصميم",
+  "SUPPLY_ORDER": "أمر التوريد",
+  "DESIGN": "التصميم",
   "PRINTING": "الطباعة",
-  "DIE_CUTTING": "الداي كت",
   "PACKAGING": "التعبئة",
   "DELIVERY": "التسليم",
 };
 
 const stageColors: Record<string, string> = {
+  "SUPPLY_ORDER": "bg-sky-100 text-sky-700",
   "DESIGN": "bg-purple-100 text-purple-700",
   "PRINTING": "bg-yellow-100 text-yellow-700",
-  "DIE_CUTTING": "bg-orange-100 text-orange-700",
   "PACKAGING": "bg-blue-100 text-blue-700",
   "DELIVERY": "bg-green-100 text-green-700",
 };
 
 const emptyForm = {
-  clientId: "", productId: "", qty: "", notes: "", deadline: "",
+  clientId: "", productId: "", qty: "", price: "", notes: "",
 };
 
 export function WorkOrders() {
@@ -74,14 +74,17 @@ export function WorkOrders() {
       toast.error("يرجى تعبئة الحقول المطلوبة (العميل، المنتج، الكمية)");
       return;
     }
+    const selectedProduct = products.find((p: any) => p.id === parseInt(form.productId));
+    const unitPrice = form.price ? parseInt(form.price) : (selectedProduct?.sellPrice || 0);
     setSaving(true);
     try {
       await api.post('/orders', {
         clientId: parseInt(form.clientId),
-        notes: form.notes,
+        notes: form.notes || `طلب جديد`,
         items: [{
           productId: parseInt(form.productId),
           quantity: parseInt(form.qty),
+          price: unitPrice,
         }],
       });
       setShowModal(false);
@@ -112,8 +115,8 @@ export function WorkOrders() {
       </div>
 
       {/* Filters bar */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-center gap-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 max-w-xs min-w-[200px]">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -125,7 +128,7 @@ export function WorkOrders() {
         </div>
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-slate-400" />
-          {["الكل", "جاري", "مكتمل", "متأخر"].map((s) => (
+          {["الكل", "جاري", "مكتمل"].map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -141,64 +144,79 @@ export function WorkOrders() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60">
-              {["رقم الأمر", "العميل", "المنتج", "المقاس", "الكمية", "النوع", "المرحلة الحالية", "الحالة", "تاريخ الطلب", "الموعد النهائي", ""].map((h) => (
-                <th key={h} className="text-right py-3 px-4 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((o) => {
-              const product = o.items?.[0]?.product;
-              const statusStr = o.currentStage === "DELIVERY" ? "مكتمل" : "جاري";
-              return (
-                <tr
-                  key={o.id}
-                  className="border-b border-slate-50 hover:bg-blue-50/30 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/work-orders/${o.id}`)}
-                >
-                  <td className="py-3 px-4 font-mono text-xs font-bold text-[#2563EB]">{o.id}</td>
-                  <td className="py-3 px-4 text-slate-800 font-medium">{o.client?.companyName}</td>
-                  <td className="py-3 px-4 text-slate-600">{product?.name}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs font-mono">{product?.size || "-"}</td>
-                  <td className="py-3 px-4 text-slate-700">{o.items?.reduce((acc: number, cur: any) => acc + cur.quantity, 0).toLocaleString("ar-EG")}</td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{product?.type || "-"}</td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColors[o.currentStage] || stageColors['DESIGN']}`}>{stageNames[o.currentStage] || o.currentStage}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStr === 'مكتمل' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{statusStr}</span>
-                  </td>
-                  <td className="py-3 px-4 text-slate-500 text-xs">{new Date(o.createdAt || Date.now()).toLocaleDateString("ar-SA")}</td>
-                  <td className="py-3 px-4 text-xs text-slate-500">-</td>
-                  <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => navigate(`/work-orders/${o.id}`)}
-                      className="flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1E40AF] font-medium"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      تفاصيل
-                      <ChevronLeft className="w-3 h-3" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={11} className="text-center py-12 text-slate-400">لا توجد أوامر تشغيل مطابقة للبحث</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[800px]">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60">
+                {["رقم الأمر", "العميل", "المنتج", "الكمية", "المرحلة الحالية", "خطوات الطباعة", "الحالة", "تاريخ الطلب", ""].map((h) => (
+                  <th key={h} className="text-right py-3 px-4 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((o) => {
+                const product = o.items?.[0]?.product;
+                const statusStr = o.currentStage === "DELIVERY" ? "مكتمل" : "جاري";
+                return (
+                  <tr
+                    key={o.id}
+                    className="border-b border-slate-50 hover:bg-blue-50/30 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/work-orders/${o.id}`)}
+                  >
+                    <td className="py-3 px-4 font-mono text-xs font-bold text-[#2563EB]">{o.id}</td>
+                    <td className="py-3 px-4 text-slate-800 font-medium">{o.client?.companyName}</td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">{product?.name}</td>
+                    <td className="py-3 px-4 text-slate-700">{o.items?.reduce((acc: number, cur: any) => acc + cur.quantity, 0).toLocaleString("ar-EG")}</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColors[o.currentStage] || stageColors['SUPPLY_ORDER']}`}>{stageNames[o.currentStage] || o.currentStage}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-wrap gap-1">
+                        {o.printInternalDone && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">داخلي</span>
+                        )}
+                        {o.printExternalDone && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200">خارجي</span>
+                        )}
+                        {o.printStickerDone && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200">استيكر</span>
+                        )}
+                        {!o.printInternalDone && !o.printExternalDone && !o.printStickerDone && (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStr === 'مكتمل' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{statusStr}</span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-500 text-xs">{new Date(o.createdAt || Date.now()).toLocaleDateString("ar-SA")}</td>
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => navigate(`/work-orders/${o.id}`)}
+                        className="flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1E40AF] font-medium"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        تفاصيل
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="text-center py-12 text-slate-400">لا توجد أوامر تشغيل مطابقة للبحث</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Stage summary */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <h3 className="font-bold text-slate-700 text-sm mb-4">توزيع الأوامر على مراحل الإنتاج</h3>
-        <div className="grid grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           {Object.entries(stageNames).map(([stageKey, stageName]) => {
             const count = orders.filter((o) => o.currentStage === stageKey).length;
             return (
@@ -224,16 +242,23 @@ export function WorkOrders() {
               </select>
             </FormField>
             <FormField label="المنتج" required>
-              <select value={form.productId} onChange={(e) => set("productId", e.target.value)} className={selectCls}>
+              <select value={form.productId} onChange={(e) => {
+                set("productId", e.target.value);
+                const p = products.find((p: any) => p.id === parseInt(e.target.value));
+                if (p) set("price", p.sellPrice.toString());
+              }} className={selectCls}>
                 <option value="">اختر المنتج...</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sellPrice} ريال)</option>)}
               </select>
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="الكمية المطلوبة" required>
               <input value={form.qty} onChange={(e) => set("qty", e.target.value)} placeholder="مثال: 5000" className={inputCls} type="number" />
+            </FormField>
+            <FormField label="سعر الوحدة (ريال)">
+              <input value={form.price} onChange={(e) => set("price", e.target.value)} placeholder="سعر الوحدة" className={inputCls} type="number" />
             </FormField>
           </div>
 
