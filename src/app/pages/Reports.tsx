@@ -1,46 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, TrendingUp, Users, Package, DollarSign } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area,
+  PieChart, Pie, Cell,
 } from "recharts";
 import { toast } from "sonner";
+import api from "../../services/api";
 
-const monthlySales = [
-  { month: "يناير", sales: 185, orders: 42 },
-  { month: "فبراير", sales: 210, orders: 51 },
-  { month: "مارس", sales: 195, orders: 46 },
-  { month: "أبريل", sales: 230, orders: 58 },
-  { month: "مايو", sales: 218, orders: 54 },
-  { month: "يونيو", sales: 240, orders: 62 },
-];
+const stageNames: Record<string, string> = {
+  "SUPPLY_ORDER": "أمر التوريد",
+  "DESIGN": "التصميم",
+  "PRINTING": "الطباعة",
+  "PACKAGING": "التعبئة",
+  "DELIVERY": "التسليم",
+};
 
-const ordersByType = [
-  { name: "صناديق قياسية", value: 42, color: "#2563EB" },
-  { name: "كرتون مطبوع", value: 28, color: "#F59E0B" },
-  { name: "علب هدايا", value: 15, color: "#8B5CF6" },
-  { name: "صناديق شحن", value: 10, color: "#16A34A" },
-  { name: "أخرى", value: 5, color: "#94A3B8" },
-];
-
-const customerRevenue = [
-  { name: "شركة الفهد", revenue: 450 },
-  { name: "مؤسسة النور", revenue: 380 },
-  { name: "شركة الأمل", revenue: 320 },
-  { name: "مصنع الجودة", revenue: 280 },
-  { name: "شركة التميز", revenue: 250 },
-];
-
-const productionEfficiency = [
-  { week: "أ١", efficiency: 88 },
-  { week: "أ٢", efficiency: 91 },
-  { week: "أ٣", efficiency: 85 },
-  { week: "م١", efficiency: 93 },
-  { week: "م٢", efficiency: 89 },
-  { week: "م٣", efficiency: 95 },
-  { week: "م٤", efficiency: 92 },
-  { week: "ي١", efficiency: 96 },
-];
+const stageColors = ["#8B5CF6", "#F59E0B", "#F97316", "#2563EB", "#16A34A"];
 
 const tabs = [
   { key: "sales", label: "تقرير المبيعات", icon: TrendingUp },
@@ -51,6 +26,35 @@ const tabs = [
 
 export function Reports() {
   const [tab, setTab] = useState("sales");
+  const [salesData, setSalesData] = useState<any>(null);
+  const [productionData, setProductionData] = useState<any>(null);
+  const [customersData, setCustomersData] = useState<any[]>([]);
+  const [financialData, setFinancialData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        const [sales, production, customers, financial] = await Promise.all([
+          api.get('/reports/sales'),
+          api.get('/reports/production'),
+          api.get('/reports/customers'),
+          api.get('/reports/financial'),
+        ]);
+        setSalesData(sales.data);
+        setProductionData(production.data);
+        setCustomersData(customers.data);
+        setFinancialData(financial.data);
+      } catch (err) {
+        console.error(err);
+        toast.error("حدث خطأ أثناء تحميل التقارير");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReports();
+  }, []);
 
   const handleExport = () => {
     toast.loading("جاري تصدير التقرير...", { id: "export" });
@@ -58,6 +62,23 @@ export function Reports() {
       toast.success("تم تصدير التقرير بنجاح — تحقق من مجلد التنزيلات", { id: "export" });
     }, 1500);
   };
+
+  if (loading) return <div className="p-8 text-center" dir="rtl">جاري تحميل التقارير...</div>;
+
+  // Prepare pie data from production report
+  const pieData = productionData?.ordersByStage
+    ? Object.entries(productionData.ordersByStage).map(([stage, count], idx) => ({
+        name: stageNames[stage] || stage,
+        value: count as number,
+        color: stageColors[idx % stageColors.length],
+      })).filter((item) => item.value > 0)
+    : [];
+
+  // Prepare bar chart data for customers
+  const customerBarData = customersData.map((c) => ({
+    name: c.companyName?.substring(0, 15) || "",
+    revenue: Math.round(c.revenue / 1000),
+  }));
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -94,138 +115,101 @@ export function Reports() {
         })}
       </div>
 
-      {tab === "sales" && (
+      {tab === "sales" && salesData && (
         <div className="space-y-5">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "إجمالي المبيعات (٦ أشهر)", value: "١,٢٧٨,٠٠٠ ريال", trend: "+٨٪" },
-              { label: "عدد الطلبات", value: "٣١٣ طلب", trend: "+١٢٪" },
-              { label: "متوسط قيمة الطلب", value: "٤,٠٨٣ ريال", trend: "+٣٪" },
+              { label: "إجمالي الإيرادات", value: `${salesData.totalRevenue?.toLocaleString()} ريال` },
+              { label: "عدد الطلبات", value: `${salesData.totalOrders} طلب` },
+              { label: "متوسط قيمة الطلب", value: `${salesData.averageOrderValue?.toLocaleString()} ريال` },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
                 <p className="text-xs text-slate-400 mb-1">{s.label}</p>
                 <p className="text-xl font-bold text-slate-800">{s.value}</p>
-                <span className="text-xs text-green-600 font-medium">{s.trend} مقارنة بنفس الفترة</span>
               </div>
             ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-bold text-slate-800 mb-4">المبيعات الشهرية (ألف ريال)</h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={monthlySales}>
-                  <defs>
-                    <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Area type="monotone" dataKey="sales" stroke="#2563EB" strokeWidth={2} fill="url(#salesFill)" name="المبيعات" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-bold text-slate-800 mb-4">توزيع المبيعات حسب النوع</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={ordersByType} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
-                    {ordersByType.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {ordersByType.map((s) => (
-                  <div key={s.name} className="flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="text-slate-600">{s.name}</span>
-                    <span className="font-bold text-slate-800 mr-auto">{s.value}٪</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       )}
 
-      {tab === "production" && (
+      {tab === "production" && productionData && (
         <div className="space-y-5">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "كفاءة الإنتاج (يونيو)", value: "٩٦٪", trend: "+٢٪" },
-              { label: "متوسط وقت الإنتاج", value: "٤.٢ يوم", trend: "-٠.٣ يوم" },
-              { label: "طلبات مكتملة في الموعد", value: "٨٩٪", trend: "+٤٪" },
+              { label: "إجمالي الطلبات", value: productionData.totalOrders },
+              { label: "طلبات مكتملة", value: productionData.completedOrders },
+              { label: "نسبة الإكمال", value: productionData.completionRate },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
                 <p className="text-xs text-slate-400 mb-1">{s.label}</p>
                 <p className="text-xl font-bold text-slate-800">{s.value}</p>
-                <span className="text-xs text-green-600 font-medium">{s.trend}</span>
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 className="font-bold text-slate-800 mb-4">كفاءة الإنتاج الأسبوعية (٪)</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={productionEfficiency}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                <YAxis domain={[80, 100]} tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Line type="monotone" dataKey="efficiency" stroke="#16A34A" strokeWidth={2.5} dot={{ fill: "#16A34A", r: 4 }} name="الكفاءة" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {pieData.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-bold text-slate-800 mb-4">توزيع الطلبات حسب المرحلة</h3>
+              <div className="flex items-start gap-8">
+                <ResponsiveContainer width="50%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
+                      {pieData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2 pt-4">
+                  {pieData.map((s: any) => (
+                    <div key={s.name} className="flex items-center gap-2 text-xs">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                      <span className="text-slate-600">{s.name}</span>
+                      <span className="font-bold text-slate-800 mr-auto">{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {tab === "customers" && (
         <div className="space-y-5">
-          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 className="font-bold text-slate-800 mb-4">إيرادات العملاء الأعلى (ألف ريال)</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={customerRevenue} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "#64748B" }} width={120} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="revenue" fill="#2563EB" radius={[0, 4, 4, 0]} name="الإيرادات" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {customersData.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-bold text-slate-800 mb-4">إيرادات العملاء الأعلى (ألف ريال)</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={customerBarData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "#64748B" }} width={120} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                  <Bar dataKey="revenue" fill="#2563EB" radius={[0, 4, 4, 0]} name="الإيرادات" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
+              <p className="text-slate-400 text-sm">لا توجد بيانات عملاء</p>
+            </div>
+          )}
         </div>
       )}
 
-      {tab === "financial" && (
+      {tab === "financial" && financialData && (
         <div className="space-y-5">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {[
-              { label: "صافي الإيرادات (يونيو)", value: "٢٤٠,٠٠٠ ريال", color: "text-[#2563EB]" },
-              { label: "إجمالي التكاليف", value: "١٥٣,٠٠٠ ريال", color: "text-orange-600" },
-              { label: "صافي الأرباح", value: "٨٧,٠٠٠ ريال", color: "text-green-600" },
+              { label: "إجمالي الإيرادات", value: `${financialData.totalRevenue?.toLocaleString()} ريال`, color: "text-[#2563EB]" },
+              { label: "إجمالي التكاليف", value: `${financialData.totalCost?.toLocaleString()} ريال`, color: "text-orange-600" },
+              { label: "صافي الأرباح", value: `${financialData.netProfit?.toLocaleString()} ريال`, color: "text-green-600" },
+              { label: "هامش الربح", value: financialData.profitMargin, color: "text-purple-600" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
                 <p className="text-xs text-slate-400 mb-1">{s.label}</p>
                 <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
               </div>
             ))}
-          </div>
-          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 className="font-bold text-slate-800 mb-4">المقارنة المالية الشهرية (ألف ريال)</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthlySales.map((m) => ({ ...m, cost: Math.round(m.sales * 0.63), profit: Math.round(m.sales * 0.37) }))} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="sales" fill="#2563EB" radius={[4, 4, 0, 0]} name="الإيرادات" />
-                <Bar dataKey="cost" fill="#F59E0B" radius={[4, 4, 0, 0]} name="التكاليف" />
-                <Bar dataKey="profit" fill="#16A34A" radius={[4, 4, 0, 0]} name="الأرباح" />
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
       )}

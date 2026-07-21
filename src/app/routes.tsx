@@ -15,6 +15,7 @@ import { Inventory } from "./pages/Inventory";
 import { Accounts } from "./pages/Accounts";
 import { Reports } from "./pages/Reports";
 import { Settings } from "./pages/Settings";
+import { Products } from "./pages/Products";
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "accounts", Component: Accounts },
       { path: "reports", Component: Reports },
       { path: "settings", Component: Settings },
+      { path: "products", Component: Products },
     ],
   },
   {

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Settings as SettingsIcon, Bell, Printer, Users, Lock, Edit2, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Printer, Users, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
+import { inputCls, selectCls } from "../components/Modal";
 
 const sections = [
   { key: "general", label: "الإعدادات العامة", icon: SettingsIcon },
@@ -11,71 +11,17 @@ const sections = [
   { key: "security", label: "الأمان", icon: Lock },
 ];
 
-const roles = ["مدير النظام", "مدير إنتاج", "مصمم", "مشغل طباعة", "مشغل داي كت", "مشغل برونز", "محاسب", "مبيعات"];
 
-const initUsers = [
-  { id: 1, name: "أحمد محمد", role: "مدير النظام", email: "ahmed@factory.com", status: "نشط" },
-  { id: 2, name: "سارة أحمد", role: "مصمم", email: "sara@factory.com", status: "نشط" },
-  { id: 3, name: "خالد إبراهيم", role: "مشغل طباعة", email: "khalid@factory.com", status: "نشط" },
-  { id: 4, name: "فارس القحطاني", role: "مشغل برونز", email: "fares@factory.com", status: "نشط" },
-  { id: 5, name: "سامي العتيبي", role: "مشغل داي كت", email: "sami@factory.com", status: "غير نشط" },
-];
-
-const emptyUser = { name: "", role: "", email: "", status: "نشط" };
 
 export function Settings() {
   const [activeSection, setActiveSection] = useState("general");
-  const [factoryName, setFactoryName] = useState("مصنع الكرتون المتطور");
-  const [vatNumber, setVatNumber] = useState("٣١٠-٤٥٦-٧٨٩");
+  const [factoryName, setFactoryName] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
   const [currency, setCurrency] = useState("ريال سعودي (SAR)");
   const [timezone, setTimezone] = useState("Asia/Riyadh (UTC+3)");
   const [notifications, setNotifications] = useState({
     lowStock: true, lateOrders: true, newOrders: false, dailyReport: true,
   });
-  const [users, setUsers] = useState(initUsers);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [editUser, setEditUser] = useState<null | (typeof initUsers[0])>(null);
-  const [userForm, setUserForm] = useState(emptyUser);
-  const [savingUser, setSavingUser] = useState(false);
-
-  const setUF = (k: string, v: string) => setUserForm((p) => ({ ...p, [k]: v }));
-
-  const openAddUser = () => {
-    setEditUser(null);
-    setUserForm(emptyUser);
-    setShowUserModal(true);
-  };
-
-  const openEditUser = (user: typeof initUsers[0]) => {
-    setEditUser(user);
-    setUserForm({ name: user.name, role: user.role, email: user.email, status: user.status });
-    setShowUserModal(true);
-  };
-
-  const handleSaveUser = () => {
-    if (!userForm.name || !userForm.email || !userForm.role) {
-      toast.error("يرجى تعبئة الاسم والبريد الإلكتروني والدور");
-      return;
-    }
-    setSavingUser(true);
-    setTimeout(() => {
-      if (editUser) {
-        setUsers((prev) => prev.map((u) => u.id === editUser.id ? { ...u, ...userForm } : u));
-        toast.success(`تم تحديث بيانات "${userForm.name}" بنجاح`);
-      } else {
-        const newId = Math.max(...users.map((u) => u.id)) + 1;
-        setUsers((prev) => [...prev, { id: newId, ...userForm }]);
-        toast.success(`تمت إضافة المستخدم "${userForm.name}" بنجاح`);
-      }
-      setSavingUser(false);
-      setShowUserModal(false);
-    }, 700);
-  };
-
-  const handleDeleteUser = (id: number, name: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    toast.success(`تم حذف المستخدم "${name}"`);
-  };
 
   const handleSaveGeneral = () => {
     toast.success("تم حفظ الإعدادات العامة بنجاح");
@@ -158,64 +104,10 @@ export function Settings() {
           )}
 
           {activeSection === "users" && (
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">إدارة المستخدمين</h3>
-                <button
-                  onClick={openAddUser}
-                  className="bg-[#2563EB] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#1E40AF] transition-colors"
-                >
-                  + إضافة مستخدم
-                </button>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    {["الاسم", "الدور الوظيفي", "البريد الإلكتروني", "الحالة", ""].map((h) => (
-                      <th key={h} className="text-right py-3 px-4 text-xs font-semibold text-slate-500">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 bg-[#2563EB] rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {u.name[0]}
-                          </div>
-                          <span className="font-semibold text-slate-800">{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">{u.role}</td>
-                      <td className="py-3 px-4 text-slate-500 text-xs font-mono">{u.email}</td>
-                      <td className="py-3 px-4">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                          u.status === "نشط" ? "bg-green-100 text-green-700 border-green-200" : "bg-slate-100 text-slate-500 border-slate-200"
-                        }`}>{u.status}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEditUser(u)}
-                            className="flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1E40AF] font-medium"
-                          >
-                            <Edit2 className="w-3 h-3" /> تعديل
-                          </button>
-                          {u.id !== 1 && (
-                            <button
-                              onClick={() => handleDeleteUser(u.id, u.name)}
-                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium"
-                            >
-                              <Trash2 className="w-3 h-3" /> حذف
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
+              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="font-bold text-slate-800 mb-1">إدارة المستخدمين</h3>
+              <p className="text-slate-400 text-sm">سيتم إضافة إدارة المستخدمين قريباً</p>
             </div>
           )}
 
@@ -306,35 +198,7 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Add/Edit User Modal */}
-      <Modal open={showUserModal} onClose={() => setShowUserModal(false)} title={editUser ? `تعديل: ${editUser.name}` : "إضافة مستخدم جديد"}>
-        <div className="space-y-4">
-          <FormField label="الاسم الكامل" required>
-            <input value={userForm.name} onChange={(e) => setUF("name", e.target.value)} placeholder="الاسم الكامل" className={inputCls} />
-          </FormField>
-          <FormField label="الدور الوظيفي" required>
-            <select value={userForm.role} onChange={(e) => setUF("role", e.target.value)} className={selectCls}>
-              <option value="">اختر الدور...</option>
-              {roles.map((r) => <option key={r}>{r}</option>)}
-            </select>
-          </FormField>
-          <FormField label="البريد الإلكتروني" required>
-            <input value={userForm.email} onChange={(e) => setUF("email", e.target.value)} placeholder="name@factory.com" className={inputCls} type="email" />
-          </FormField>
-          <FormField label="الحالة">
-            <select value={userForm.status} onChange={(e) => setUF("status", e.target.value)} className={selectCls}>
-              <option value="نشط">نشط</option>
-              <option value="غير نشط">غير نشط</option>
-            </select>
-          </FormField>
-          {!editUser && (
-            <FormField label="كلمة المرور الأولية">
-              <input type="password" placeholder="سيتم إرسالها عبر البريد الإلكتروني" className={inputCls} disabled />
-            </FormField>
-          )}
-        </div>
-        <ModalFooter onClose={() => setShowUserModal(false)} onConfirm={handleSaveUser} confirmLabel={editUser ? "حفظ التعديلات" : "إضافة المستخدم"} loading={savingUser} />
-      </Modal>
+
     </div>
   );
 }

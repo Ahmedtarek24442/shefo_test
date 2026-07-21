@@ -1,280 +1,176 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Plus, Search, Filter, Eye } from "lucide-react";
-import { Badge } from "../components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
+import { Search, Plus, Filter, Eye } from "lucide-react";
+import { toast } from "sonner";
+import api from "../../services/api";
 
-const ordersData = [
-  {
-    id: "ORD-2401",
-    customer: "شركة الفهد التجارية",
-    product: "صندوق كرتون 40×30×20",
-    quantity: 5000,
-    price: "25,000 ريال",
-    orderDate: "2024-06-25",
-    deliveryDate: "2024-07-05",
-    status: "قيد التنفيذ",
-  },
-  {
-    id: "ORD-2402",
-    customer: "مؤسسة النور للتغليف",
-    product: "صندوق مطبوع بالألوان",
-    quantity: 3000,
-    price: "18,000 ريال",
-    orderDate: "2024-06-24",
-    deliveryDate: "2024-07-01",
-    status: "مكتمل",
-  },
-  {
-    id: "ORD-2403",
-    customer: "شركة الأمل الصناعية",
-    product: "كرتون مقوى مزدوج",
-    quantity: 7000,
-    price: "35,000 ريال",
-    orderDate: "2024-06-24",
-    deliveryDate: "2024-07-10",
-    status: "قيد التنفيذ",
-  },
-  {
-    id: "ORD-2404",
-    customer: "مصنع الجودة للكرتون",
-    product: "علب هدايا فاخرة",
-    quantity: 2000,
-    price: "12,000 ريال",
-    orderDate: "2024-06-23",
-    deliveryDate: "2024-06-28",
-    status: "متأخر",
-  },
-  {
-    id: "ORD-2405",
-    customer: "شركة التميز التجارية",
-    product: "صندوق شحن دولي",
-    quantity: 4500,
-    price: "22,500 ريال",
-    orderDate: "2024-06-23",
-    deliveryDate: "2024-07-08",
-    status: "قيد المراجعة",
-  },
-  {
-    id: "ORD-2406",
-    customer: "مؤسسة الإبداع للتعبئة",
-    product: "صندوق كرتون صغير",
-    quantity: 10000,
-    price: "30,000 ريال",
-    orderDate: "2024-06-22",
-    deliveryDate: "2024-06-30",
-    status: "قيد التنفيذ",
-  },
-  {
-    id: "ORD-2407",
-    customer: "شركة الصناعات الحديثة",
-    product: "كرتون مموج ثلاثي",
-    quantity: 6000,
-    price: "36,000 ريال",
-    orderDate: "2024-06-22",
-    deliveryDate: "2024-07-12",
-    status: "قيد التصميم",
-  },
-  {
-    id: "ORD-2408",
-    customer: "مصنع الأمانة للورق",
-    product: "علب تغليف فاخرة",
-    quantity: 1500,
-    price: "9,000 ريال",
-    orderDate: "2024-06-21",
-    deliveryDate: "2024-06-27",
-    status: "مكتمل",
-  },
-];
+const stageNames: Record<string, string> = {
+  "SUPPLY_ORDER": "أمر التوريد",
+  "DESIGN": "التصميم",
+  "PRINTING": "الطباعة",
+  "PACKAGING": "التعبئة",
+  "DELIVERY": "التسليم",
+};
+
+const stageColors: Record<string, string> = {
+  "SUPPLY_ORDER": "bg-sky-100 text-sky-700",
+  "DESIGN": "bg-purple-100 text-purple-700",
+  "PRINTING": "bg-yellow-100 text-yellow-700",
+  "PACKAGING": "bg-blue-100 text-blue-700",
+  "DELIVERY": "bg-green-100 text-green-700",
+};
 
 export function Orders() {
   const navigate = useNavigate();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("الكل");
 
-  const filteredOrders = ordersData.filter((order) => {
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get('/orders');
+        setOrders(res.data);
+      } catch (err) {
+        console.error(err);
+        toast.error("حدث خطأ أثناء تحميل الطلبات");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.id.includes(searchTerm) ||
-      order.customer.includes(searchTerm) ||
-      order.product.includes(searchTerm);
-    const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
+      order.id.toString().includes(searchTerm) ||
+      order.client?.companyName?.includes(searchTerm) ||
+      order.items?.some((item: any) => item.product?.name?.includes(searchTerm));
+    const orderStatus = order.currentStage === "DELIVERY" ? "مكتمل" : "جاري";
+    const matchesStatus = statusFilter === "الكل" || orderStatus === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "مكتمل":
-        return "bg-green-500";
-      case "متأخر":
-        return "bg-red-500";
-      case "قيد التنفيذ":
-        return "bg-orange-500";
-      case "قيد المراجعة":
-        return "bg-blue-500";
-      case "قيد التصميم":
-        return "bg-purple-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
+  const totalValue = orders.reduce((sum, o) => sum + o.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0) || 0, 0);
+  const completedCount = orders.filter((o) => o.currentStage === "DELIVERY").length;
+  const inProgressCount = orders.filter((o) => o.currentStage !== "DELIVERY").length;
+
+  if (loading) return <div className="p-8 text-center" dir="rtl">جاري التحميل...</div>;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-5" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">إدارة الطلبات</h1>
-          <p className="text-muted-foreground mt-1">عرض ومتابعة جميع الطلبات</p>
+          <h1 className="text-2xl font-bold text-slate-800">إدارة الطلبات</h1>
+          <p className="text-slate-500 text-sm mt-0.5">إجمالي {orders.length} طلب</p>
         </div>
-        <Button className="bg-[#2563EB] hover:bg-[#1E40AF] gap-2">
-          <Plus className="w-5 h-5" />
+        <button
+          onClick={() => navigate("/work-orders")}
+          className="flex items-center gap-2 bg-[#2563EB] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1E40AF] transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
           إضافة طلب جديد
-        </Button>
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "إجمالي الطلبات", value: orders.length, color: "text-[#2563EB]", bg: "bg-blue-50" },
+          { label: "جاري التنفيذ", value: inProgressCount, color: "text-orange-600", bg: "bg-orange-50" },
+          { label: "مكتمل", value: completedCount, color: "text-green-600", bg: "bg-green-50" },
+          { label: "قيمة الطلبات", value: `${totalValue.toLocaleString()} ريال`, color: "text-purple-600", bg: "bg-purple-50" },
+        ].map((s) => (
+          <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-100`}>
+            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-slate-500 mt-1">{s.label}</p>
+          </div>
+        ))}
       </div>
 
       {/* Toolbar */}
-      <Card className="shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="البحث عن طلب..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px]">
-                <Filter className="w-4 h-4 ml-2" />
-                <SelectValue placeholder="فلترة حسب الحالة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="قيد التنفيذ">قيد التنفيذ</SelectItem>
-                <SelectItem value="مكتمل">مكتمل</SelectItem>
-                <SelectItem value="متأخر">متأخر</SelectItem>
-                <SelectItem value="قيد المراجعة">قيد المراجعة</SelectItem>
-                <SelectItem value="قيد التصميم">قيد التصميم</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 max-w-xs min-w-[200px]">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="البحث عن طلب..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full h-9 bg-slate-50 rounded-lg pr-9 pl-4 text-sm border border-slate-200 outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-slate-400" />
+          {["الكل", "جاري", "مكتمل"].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                statusFilter === s ? "bg-[#2563EB] text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Orders Table */}
-      <Card className="shadow-sm">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-right py-4 px-6 font-semibold">رقم الطلب</th>
-                  <th className="text-right py-4 px-6 font-semibold">العميل</th>
-                  <th className="text-right py-4 px-6 font-semibold">اسم المنتج</th>
-                  <th className="text-right py-4 px-6 font-semibold">الكمية</th>
-                  <th className="text-right py-4 px-6 font-semibold">السعر</th>
-                  <th className="text-right py-4 px-6 font-semibold">تاريخ الطلب</th>
-                  <th className="text-right py-4 px-6 font-semibold">موعد التسليم</th>
-                  <th className="text-right py-4 px-6 font-semibold">الحالة</th>
-                  <th className="text-right py-4 px-6 font-semibold">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                {["رقم الطلب", "العميل", "المنتج", "الكمية", "السعر", "المرحلة", "تاريخ الطلب", ""].map((h) => (
+                  <th key={h} className="text-right py-3 px-4 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrders.map((order) => {
+                const totalQty = order.items?.reduce((acc: number, item: any) => acc + item.quantity, 0) || 0;
+                const totalPrice = order.items?.reduce((acc: number, item: any) => acc + item.quantity * item.price, 0) || 0;
+                const productName = order.items?.map((item: any) => item.product?.name).join(" و ") || "—";
+                return (
                   <tr
                     key={order.id}
-                    className="border-b hover:bg-muted/30 transition-colors"
+                    className="border-b border-slate-50 hover:bg-blue-50/30 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/work-orders/${order.id}`)}
                   >
-                    <td className="py-4 px-6 font-bold text-[#2563EB]">
-                      {order.id}
+                    <td className="py-3 px-4 font-mono text-xs font-bold text-[#2563EB]">{order.id}</td>
+                    <td className="py-3 px-4 font-medium text-slate-800">{order.client?.companyName}</td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">{productName}</td>
+                    <td className="py-3 px-4 text-slate-700">{totalQty.toLocaleString()}</td>
+                    <td className="py-3 px-4 font-medium text-green-600">{totalPrice.toLocaleString()} ريال</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColors[order.currentStage] || "bg-slate-100 text-slate-600"}`}>
+                        {stageNames[order.currentStage] || order.currentStage}
+                      </span>
                     </td>
-                    <td className="py-4 px-6">{order.customer}</td>
-                    <td className="py-4 px-6 font-medium">{order.product}</td>
-                    <td className="py-4 px-6">
-                      {order.quantity.toLocaleString()} قطعة
-                    </td>
-                    <td className="py-4 px-6 font-medium text-green-600">
-                      {order.price}
-                    </td>
-                    <td className="py-4 px-6 text-muted-foreground">
-                      {order.orderDate}
-                    </td>
-                    <td className="py-4 px-6 text-muted-foreground">
-                      {order.deliveryDate}
-                    </td>
-                    <td className="py-4 px-6">
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/orders/${order.id}`)}
-                        className="hover:bg-blue-50"
+                    <td className="py-3 px-4 text-slate-500 text-xs">{new Date(order.createdAt).toLocaleDateString("ar-SA")}</td>
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => navigate(`/work-orders/${order.id}`)}
+                        className="flex items-center gap-1 text-xs text-[#2563EB] font-medium hover:text-[#1E40AF]"
                       >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                        <Eye className="w-3.5 h-3.5" /> تفاصيل
+                      </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">إجمالي الطلبات</p>
-            <h3 className="text-3xl font-bold">{ordersData.length}</h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">قيد التنفيذ</p>
-            <h3 className="text-3xl font-bold text-orange-500">
-              {ordersData.filter((o) => o.status === "قيد التنفيذ").length}
-            </h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">مكتمل</p>
-            <h3 className="text-3xl font-bold text-green-500">
-              {ordersData.filter((o) => o.status === "مكتمل").length}
-            </h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">متأخر</p>
-            <h3 className="text-3xl font-bold text-red-500">
-              {ordersData.filter((o) => o.status === "متأخر").length}
-            </h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">قيمة الطلبات</p>
-            <h3 className="text-2xl font-bold text-green-600">187.5K</h3>
-          </CardContent>
-        </Card>
+                );
+              })}
+              {filteredOrders.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center py-12 text-slate-400">لا توجد طلبات مطابقة للبحث</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

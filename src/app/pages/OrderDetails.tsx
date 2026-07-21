@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../services/api";
+import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
 
 type StageStatus = "completed" | "active" | "pending";
 
@@ -57,6 +58,13 @@ export function OrderDetails() {
   const [editNotes, setEditNotes] = useState("");
   const [savingStage, setSavingStage] = useState(false);
   const [savingPrintType, setSavingPrintType] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryForm, setDeliveryForm] = useState<{
+    amountReceived: string;
+    paymentMethod: string;
+    notes: string;
+    items: { productId: number; productName: string; quantity: number; deliveredQty: string }[];
+  }>({ amountReceived: "", paymentMethod: "نقدي", notes: "", items: [] });
 
   const fetchOrder = async () => {
     try {
@@ -105,6 +113,53 @@ export function OrderDetails() {
       fetchOrder();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "حدث خطأ");
+    } finally {
+      setSavingStage(false);
+    }
+  };
+
+  const handleOpenDeliveryModal = () => {
+    if (!order) return;
+    const items = order.items?.map((item: any) => ({
+      productId: item.product.id,
+      productName: item.product.name,
+      quantity: item.quantity,
+      deliveredQty: item.deliveredQty?.toString() || item.quantity.toString(),
+    })) || [];
+    
+    const totalOrderValue = order.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0) || 0;
+    const totalPaid = order.payments?.reduce((s: number, p: any) => s + p.amount, 0) || 0;
+    const restMoney = totalOrderValue - totalPaid;
+
+    setDeliveryForm({
+      amountReceived: restMoney > 0 ? restMoney.toString() : "0",
+      paymentMethod: "نقدي",
+      notes: "",
+      items,
+    });
+    setShowDeliveryModal(true);
+  };
+
+  const handleSubmitDelivery = async () => {
+    setSavingStage(true);
+    try {
+      const payload = {
+        stage: "DELIVERY",
+        notes: deliveryForm.notes || "تم تسليم الطلب وتصفية الحسابات المالية",
+        amountReceived: parseInt(deliveryForm.amountReceived) || 0,
+        paymentMethod: deliveryForm.paymentMethod,
+        itemsDelivered: deliveryForm.items.map((i) => ({
+          productId: i.productId,
+          deliveredQty: parseInt(i.deliveredQty) || 0,
+        })),
+      };
+
+      await api.post(`/orders/${id}/stages`, payload);
+      toast.success("تم إتمام تسليم الطلب وتحديث الحسابات بنجاح");
+      setShowDeliveryModal(false);
+      fetchOrder();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "حدث خطأ أثناء حفظ التسليم");
     } finally {
       setSavingStage(false);
     }
@@ -269,7 +324,15 @@ export function OrderDetails() {
                       {/* Footer actions */}
                       {isActive && (
                         <div className="px-3 pb-3">
-                          {editingStage === stage.key ? (
+                          {stage.key === "DELIVERY" ? (
+                            <button
+                              onClick={handleOpenDeliveryModal}
+                              className="w-full flex items-center justify-center gap-1 text-[10px] bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-all font-medium"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              تأكيد التسليم والمالية
+                            </button>
+                          ) : editingStage === stage.key ? (
                             <div className="space-y-1.5">
                               <textarea
                                 className="w-full text-[11px] border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#2563EB] resize-none bg-white"
@@ -389,7 +452,7 @@ export function OrderDetails() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
-              {["المنتج", "المقاس", "الكمية", "سعر الوحدة", "الإجمالي"].map((h) => (
+              {["المنتج", "المقاس", "الكمية المطلوبة", "الكمية المسلمة", "الكمية المتبقية", "سعر الوحدة", "الإجمالي"].map((h) => (
                 <th key={h} className="text-right py-2.5 px-4 text-xs font-semibold text-slate-500">{h}</th>
               ))}
             </tr>
@@ -400,6 +463,8 @@ export function OrderDetails() {
                 <td className="py-3 px-4 font-medium text-slate-800">{item.product?.name}</td>
                 <td className="py-3 px-4 text-slate-500 text-xs font-mono">{item.product?.sizes || "—"}</td>
                 <td className="py-3 px-4 text-slate-700">{item.quantity.toLocaleString("ar-SA")}</td>
+                <td className="py-3 px-4 text-slate-700">{item.deliveredQty?.toLocaleString("ar-SA") || 0}</td>
+                <td className="py-3 px-4 text-red-600 font-medium">{Math.max(0, item.quantity - (item.deliveredQty || 0)).toLocaleString("ar-SA")}</td>
                 <td className="py-3 px-4 text-slate-600">{item.price.toLocaleString("ar-SA")} ريال</td>
                 <td className="py-3 px-4 font-bold text-green-600">{(item.quantity * item.price).toLocaleString("ar-SA")} ريال</td>
               </tr>
@@ -407,7 +472,7 @@ export function OrderDetails() {
           </tbody>
           <tfoot>
             <tr className="bg-slate-50 border-t border-slate-200">
-              <td colSpan={4} className="py-3 px-4 text-xs font-bold text-slate-700">الإجمالي</td>
+              <td colSpan={6} className="py-3 px-4 text-xs font-bold text-slate-700">الإجمالي</td>
               <td className="py-3 px-4 font-bold text-green-600">
                 {order.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0).toLocaleString("ar-SA")} ريال
               </td>
@@ -415,6 +480,76 @@ export function OrderDetails() {
           </tfoot>
         </table>
       </div>
+
+      {/* Delivery Confirmation Modal */}
+      <Modal open={showDeliveryModal} onClose={() => setShowDeliveryModal(false)} title="تأكيد تسليم الطلب والمالية" width="max-w-xl">
+        <div className="space-y-4">
+          <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-1 text-slate-600">
+            <p>إجمالي قيمة الطلب: <span className="font-bold text-slate-800">{order.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0).toLocaleString("ar-SA")} ريال</span></p>
+            <p>المدفوع سابقاً: <span className="font-bold text-green-600">{order.payments?.reduce((s: number, p: any) => s + p.amount, 0).toLocaleString("ar-SA")} ريال</span></p>
+            <p>المتبقي حالياً: <span className="font-bold text-red-600">{(order.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0) - (order.payments?.reduce((s: number, p: any) => s + p.amount, 0) || 0)).toLocaleString("ar-SA")} ريال</span></p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="المبلغ المستلم الآن (ريال)" required>
+              <input
+                value={deliveryForm.amountReceived}
+                onChange={(e) => setDeliveryForm(p => ({ ...p, amountReceived: e.target.value }))}
+                className={inputCls}
+                type="number"
+              />
+            </FormField>
+            <FormField label="طريقة الدفع">
+              <select
+                value={deliveryForm.paymentMethod}
+                onChange={(e) => setDeliveryForm(p => ({ ...p, paymentMethod: e.target.value }))}
+                className={selectCls}
+              >
+                <option value="نقدي">نقدي</option>
+                <option value="تحويل بنكي">تحويل بنكي</option>
+                <option value="شيك">شيك</option>
+              </select>
+            </FormField>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            <h4 className="text-xs font-bold text-slate-700 mb-2">تحديث الكميات المسلمة:</h4>
+            <div className="space-y-3">
+              {deliveryForm.items.map((item, idx) => (
+                <div key={item.productId} className="flex items-center justify-between gap-4 p-2 bg-slate-50 rounded-lg">
+                  <span className="text-xs font-medium text-slate-700">{item.productName} (مطلوب: {item.quantity})</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">الكمية المسلمة:</span>
+                    <input
+                      type="number"
+                      value={item.deliveredQty}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDeliveryForm(prev => {
+                          const updated = [...prev.items];
+                          updated[idx] = { ...updated[idx], deliveredQty: val };
+                          return { ...prev, items: updated };
+                        });
+                      }}
+                      className="w-20 h-7 text-xs border border-slate-200 rounded px-2 outline-none focus:border-[#2563EB]"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <FormField label="ملاحظات التسليم">
+            <input
+              value={deliveryForm.notes}
+              onChange={(e) => setDeliveryForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="مثال: تم تسليم الدفعة كاملة واستلام شيك..."
+              className={inputCls}
+            />
+          </FormField>
+        </div>
+        <ModalFooter onClose={() => setShowDeliveryModal(false)} onConfirm={handleSubmitDelivery} confirmLabel="إتمام التسليم والمالية" loading={savingStage} />
+      </Modal>
     </div>
   );
 }

@@ -26,14 +26,7 @@ const stageNames: Record<string, string> = {
   "DELIVERY": "مكتمل",
 };
 
-const monthlySales = [
-  { month: "يناير", sales: 185, profit: 42 },
-  { month: "فبراير", sales: 210, profit: 55 },
-  { month: "مارس", sales: 195, profit: 48 },
-  { month: "أبريل", sales: 230, profit: 61 },
-  { month: "مايو", sales: 218, profit: 57 },
-  { month: "يونيو", sales: 240, profit: 68 },
-];
+
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -118,26 +111,9 @@ export function Dashboard() {
             <h3 className="font-bold text-slate-800">المبيعات والأرباح الشهرية</h3>
             <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full">ألف ريال</span>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={monthlySales}>
-              <defs>
-                <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#16A34A" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#16A34A" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94A3B8" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E2E8F0" }} />
-              <Area type="monotone" dataKey="sales" stroke="#2563EB" strokeWidth={2} fill="url(#salesGrad)" name="المبيعات" />
-              <Area type="monotone" dataKey="profit" stroke="#16A34A" strokeWidth={2} fill="url(#profitGrad)" name="الأرباح" />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-center h-[220px] text-slate-400 text-sm">
+            لا تتوفر بيانات مبيعات شهرية حالياً
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">

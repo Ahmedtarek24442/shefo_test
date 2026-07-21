@@ -1,48 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ChevronRight, Phone, MapPin, Mail, Building, TrendingUp, Package, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
+import api from "../../services/api";
+import { egyptCities } from "../../data/egyptCities";
 
-const customerData: Record<string, {
-  id: string; name: string; contact: string; phone: string; email: string;
-  city: string; address: string; taxNo: string; creditLimit: string;
-  totalOrders: number; totalRevenue: string; totalProfit: string;
-  orders: { id: string; product: string; qty: string; date: string; amount: string; profit: string; status: string; stage: string }[];
-}> = {
-  "C001": {
-    id: "C001", name: "شركة الفهد التجارية", contact: "عبدالله الفهد",
-    phone: "٠٥٠-١٢٣-٤٥٦٧", email: "info@alfhd.com",
-    city: "الرياض", address: "حي العليا، شارع الملك فهد",
-    taxNo: "٣٠٠-١٢٣-٤٥٦", creditLimit: "٢٠٠,٠٠٠ ريال",
-    totalOrders: 45, totalRevenue: "٤٥٠,٠٠٠", totalProfit: "١٣٠,٥٠٠",
-    orders: [
-      { id: "WO-2024-0086", product: "صندوق ٤٠×٣٠×٢٠", qty: "٥٠٠٠", date: "٢٥/٠٦/٢٠٢٤", amount: "٢٨,٥٠٠", profit: "٨,٢٠٠", status: "جاري", stage: "الطباعة" },
-      { id: "WO-2024-0079", product: "صندوق عرض بداي كت", qty: "٣٥٠٠", date: "٢١/٠٦/٢٠٢٤", amount: "٢٢,٤٠٠", profit: "٦,٥٠٠", status: "جاري", stage: "التعبئة" },
-      { id: "WO-2024-0067", product: "كرتون مقوى ثلاثي", qty: "٨٠٠٠", date: "١٠/٠٦/٢٠٢٤", amount: "٤٨,٠٠٠", profit: "١٣,٨٠٠", status: "مكتمل", stage: "التسليم" },
-      { id: "WO-2024-0054", product: "علب هدايا مطبوعة", qty: "٢٠٠٠", date: "٠١/٠٦/٢٠٢٤", amount: "١٦,٨٠٠", profit: "٤,٩٠٠", status: "مكتمل", stage: "التسليم" },
-      { id: "WO-2024-0041", product: "صندوق شحن مزدوج", qty: "٦٠٠٠", date: "٢٠/٠٥/٢٠٢٤", amount: "٣٦,٠٠٠", profit: "١٠,٤٠٠", status: "مكتمل", stage: "التسليم" },
-    ],
-  },
-};
-
-const defaultCustomer = customerData["C001"];
-
-const statusStyle: Record<string, string> = {
-  "جاري": "bg-blue-100 text-blue-700 border-blue-200",
-  "مكتمل": "bg-green-100 text-green-700 border-green-200",
-  "متأخر": "bg-red-100 text-red-700 border-red-200",
+const stageNames: Record<string, string> = {
+  "SUPPLY_ORDER": "أمر التوريد",
+  "DESIGN": "التصميم",
+  "PRINTING": "الطباعة",
+  "PACKAGING": "التعبئة",
+  "DELIVERY": "التسليم",
 };
 
 export function CustomerDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const customer = customerData[id ?? ""] ?? defaultCustomer;
+  const [customer, setCustomer] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
-  const [editName, setEditName] = useState(customer.name);
-  const [editContact, setEditContact] = useState(customer.contact);
-  const [editPhone, setEditPhone] = useState(customer.phone);
-  const [editEmail, setEditEmail] = useState(customer.email);
+  const [editForm, setEditForm] = useState({ companyName: "", phone: "", email: "", city: "", address: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const clientRes = await api.get(`/clients/${id}`);
+        setCustomer(clientRes.data);
+        const c = clientRes.data;
+        // The backend might be storing city in 'address' or we might need to separate them.
+        // We'll keep it simple: assume 'city' is part of the address or we just let them pick a city and append it.
+        // For now, let's add a dedicated city field to our edit form state.
+        setEditForm({
+          companyName: c.companyName || "",
+          phone: c.phone || "",
+          email: c.email || "",
+          city: "", // Default to empty if we don't know it. If stored in address, user can re-select.
+          address: c.address || "",
+        });
+      } catch (err) {
+        console.error(err);
+        toast.error("حدث خطأ أثناء تحميل بيانات العميل");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        ...editForm,
+        address: editForm.city ? `${editForm.city} - ${editForm.address}` : editForm.address,
+      };
+      await api.patch(`/clients/${id}`, payload);
+      const res = await api.get(`/clients/${id}`);
+      setCustomer(res.data);
+      setShowEdit(false);
+      toast.success("تم تحديث بيانات العميل بنجاح");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "حدث خطأ أثناء التحديث");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !customer) return <div className="p-8 text-center" dir="rtl">جاري التحميل...</div>;
+
+  const totalOrders = customer.orders?.length || 0;
+  const totalRevenue = customer.orders?.reduce((sum: number, order: any) => {
+    return sum + order.items.reduce((s: number, item: any) => s + item.quantity * item.price, 0);
+  }, 0) || 0;
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -50,7 +82,7 @@ export function CustomerDetails() {
       <div className="flex items-center gap-2 text-sm">
         <button onClick={() => navigate("/customers")} className="text-slate-500 hover:text-slate-700">العملاء</button>
         <ChevronRight className="w-4 h-4 text-slate-400" />
-        <span className="font-bold text-slate-800">{customer.name}</span>
+        <span className="font-bold text-slate-800">{customer.companyName}</span>
       </div>
 
       {/* Profile header */}
@@ -61,18 +93,22 @@ export function CustomerDetails() {
               <Building className="w-8 h-8 text-[#2563EB]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-800">{customer.name}</h1>
-              <p className="text-slate-500 text-sm mt-0.5">{customer.contact} — مدير المشتريات</p>
+              <h1 className="text-xl font-bold text-slate-800">{customer.companyName}</h1>
+              <p className="text-slate-500 text-sm mt-0.5">{customer.responsible?.name || "—"}</p>
               <div className="flex items-center gap-4 mt-2">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <Phone className="w-3.5 h-3.5" /> {customer.phone}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Mail className="w-3.5 h-3.5" /> {customer.email}
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <MapPin className="w-3.5 h-3.5" /> {customer.city} — {customer.address}
-                </div>
+                {customer.email && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <Mail className="w-3.5 h-3.5" /> {customer.email}
+                  </div>
+                )}
+                {customer.address && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <MapPin className="w-3.5 h-3.5" /> {customer.address}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -88,19 +124,21 @@ export function CustomerDetails() {
         <div className="grid grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100">
           <div>
             <p className="text-xs text-slate-400">الرقم الضريبي</p>
-            <p className="font-semibold text-slate-700 text-sm mt-0.5">{customer.taxNo}</p>
+            <p className="font-semibold text-slate-700 text-sm mt-0.5">{customer.taxNumber || "—"}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400">حد الائتمان</p>
-            <p className="font-semibold text-slate-700 text-sm mt-0.5">{customer.creditLimit}</p>
+            <p className="font-semibold text-slate-700 text-sm mt-0.5">
+              {customer.creditLimit && customer.creditLimit > 0 ? `${customer.creditLimit.toLocaleString()} ريال` : "غير محدد"}
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-400">إجمالي الطلبات</p>
-            <p className="font-semibold text-[#2563EB] text-sm mt-0.5">{customer.totalOrders} طلب</p>
+            <p className="font-semibold text-[#2563EB] text-sm mt-0.5">{totalOrders} طلب</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">تاريخ التسجيل</p>
-            <p className="font-semibold text-slate-700 text-sm mt-0.5">١٥ مارس ٢٠٢٢</p>
+            <p className="text-xs text-slate-400">رقم العميل</p>
+            <p className="font-semibold text-slate-700 text-sm mt-0.5">#{customer.id}</p>
           </div>
         </div>
       </div>
@@ -113,7 +151,7 @@ export function CustomerDetails() {
               <Package className="w-5 h-5 text-[#2563EB]" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{customer.totalOrders}</p>
+              <p className="text-2xl font-bold text-slate-800">{totalOrders}</p>
               <p className="text-xs text-slate-500">إجمالي الطلبات</p>
             </div>
           </div>
@@ -124,7 +162,7 @@ export function CustomerDetails() {
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-800">{customer.totalRevenue}</p>
+              <p className="text-2xl font-bold text-slate-800">{totalRevenue.toLocaleString()}</p>
               <p className="text-xs text-slate-500">إجمالي الإيرادات (ريال)</p>
             </div>
           </div>
@@ -135,8 +173,10 @@ export function CustomerDetails() {
               <Clock className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-600">{customer.totalProfit}</p>
-              <p className="text-xs text-slate-500">إجمالي الأرباح (ريال)</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {customer.orders?.filter((o: any) => o.currentStage !== "DELIVERY").length || 0}
+              </p>
+              <p className="text-xs text-slate-500">طلبات جارية</p>
             </div>
           </div>
         </div>
@@ -146,46 +186,68 @@ export function CustomerDetails() {
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800">سجل الطلبات</h3>
-          <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full">{customer.orders.length} طلبات</span>
+          <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full">{totalOrders} طلبات</span>
         </div>
         <div className="p-5 space-y-3">
-          {customer.orders.map((order, idx) => (
-            <div
-              key={order.id}
-              className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-[#2563EB]/30 hover:bg-blue-50/20 cursor-pointer transition-all group"
-              onClick={() => navigate(`/work-orders/${order.id}`)}
-            >
-              {/* Timeline dot */}
-              <div className="flex flex-col items-center shrink-0">
-                <div className={`w-3 h-3 rounded-full ${order.status === "مكتمل" ? "bg-green-500" : order.status === "جاري" ? "bg-[#2563EB]" : "bg-red-500"}`} />
-                {idx < customer.orders.length - 1 && <div className="w-0.5 h-8 bg-slate-200 mt-1" />}
-              </div>
+          {customer.orders?.length > 0 ? customer.orders.map((order: any, idx: number) => {
+            const orderTotal = order.items?.reduce((s: number, i: any) => s + i.quantity * i.price, 0) || 0;
+            const orderQty = order.items?.reduce((s: number, i: any) => s + i.quantity, 0) || 0;
+            const deliveredQty = order.items?.reduce((s: number, i: any) => s + (i.deliveredQty || 0), 0) || 0;
+            const remainingQty = Math.max(0, orderQty - deliveredQty);
+            const totalPaid = order.payments?.reduce((s: number, p: any) => s + p.amount, 0) || 0;
+            const restMoney = orderTotal - totalPaid;
 
-              {/* Order info */}
-              <div className="flex-1 flex items-center gap-6">
-                <div>
-                  <p className="font-mono text-xs font-bold text-[#2563EB]">{order.id}</p>
-                  <p className="font-semibold text-slate-800 text-sm mt-0.5">{order.product}</p>
-                </div>
-                <div className="text-xs text-slate-500">
-                  <p>الكمية: <span className="font-semibold text-slate-700">{order.qty} قطعة</span></p>
-                  <p className="mt-0.5">التاريخ: {order.date}</p>
-                </div>
-                <div className="text-xs">
-                  <p className="text-slate-500">المبلغ: <span className="font-bold text-slate-800">{order.amount} ريال</span></p>
-                  <p className="text-slate-500 mt-0.5">الربح: <span className="font-bold text-green-600">{order.profit} ريال</span></p>
-                </div>
-                <div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusStyle[order.status]}`}>
-                    {order.status}
-                  </span>
-                  <p className="text-[11px] text-slate-400 mt-1">المرحلة: {order.stage}</p>
-                </div>
-              </div>
+            const productName = order.items?.map((i: any) => i.product?.name).join(" و ") || "—";
+            const isCompleted = order.currentStage === "DELIVERY";
+            const statusLabel = isCompleted ? "مكتمل" : "جاري";
+            const statusCls = isCompleted
+              ? "bg-green-100 text-green-700 border-green-200"
+              : "bg-blue-100 text-blue-700 border-blue-200";
 
-              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#2563EB] transition-colors shrink-0" />
-            </div>
-          ))}
+            return (
+              <div
+                key={order.id}
+                className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-[#2563EB]/30 hover:bg-blue-50/20 cursor-pointer transition-all group"
+                onClick={() => navigate(`/work-orders/${order.id}`)}
+              >
+                {/* Timeline dot */}
+                <div className="flex flex-col items-center shrink-0">
+                  <div className={`w-3 h-3 rounded-full ${isCompleted ? "bg-green-500" : "bg-[#2563EB]"}`} />
+                  {idx < customer.orders.length - 1 && <div className="w-0.5 h-8 bg-slate-200 mt-1" />}
+                </div>
+
+                {/* Order info */}
+                <div className="flex-1 flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-[150px]">
+                    <p className="font-mono text-xs font-bold text-[#2563EB]">#{order.id}</p>
+                    <p className="font-semibold text-slate-800 text-sm mt-0.5">{productName}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">التاريخ: {new Date(order.createdAt).toLocaleDateString("ar-SA")}</p>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <p className="text-slate-500">الكمية المطلوبة: <span className="font-semibold text-slate-700">{orderQty.toLocaleString()} قطعة</span></p>
+                    <p className="text-slate-500">المسلمة: <span className="font-semibold text-green-600">{deliveredQty.toLocaleString()}</span> | المتبقية: <span className="font-semibold text-red-600">{remainingQty.toLocaleString()}</span></p>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <p className="text-slate-500">قيمة الطلب: <span className="font-bold text-slate-800">{orderTotal.toLocaleString()} ريال</span></p>
+                    <p className="text-slate-500">المسدد: <span className="font-semibold text-green-600">{totalPaid.toLocaleString()}</span> | المتبقي: <span className="font-semibold text-red-600">{restMoney.toLocaleString()} ريال</span></p>
+                  </div>
+
+                  <div className="text-left">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusCls}`}>
+                      {statusLabel}
+                    </span>
+                    <p className="text-[11px] text-slate-400 mt-1">المرحلة: {stageNames[order.currentStage] || order.currentStage}</p>
+                  </div>
+                </div>
+
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#2563EB] transition-colors shrink-0" />
+              </div>
+            );
+          }) : (
+            <div className="text-center py-8 text-slate-400 text-sm">لا توجد طلبات لهذا العميل</div>
+          )}
         </div>
       </div>
 
@@ -193,32 +255,29 @@ export function CustomerDetails() {
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="تعديل بيانات العميل">
         <div className="space-y-4">
           <FormField label="اسم الشركة" required>
-            <input value={editName} onChange={(e) => setEditName(e.target.value)} className={inputCls} />
-          </FormField>
-          <FormField label="جهة الاتصال" required>
-            <input value={editContact} onChange={(e) => setEditContact(e.target.value)} className={inputCls} />
+            <input value={editForm.companyName} onChange={(e) => setEditForm(p => ({ ...p, companyName: e.target.value }))} className={inputCls} />
           </FormField>
           <FormField label="رقم الهاتف">
-            <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className={inputCls} />
+            <input value={editForm.phone} onChange={(e) => setEditForm(p => ({ ...p, phone: e.target.value }))} className={inputCls} />
           </FormField>
           <FormField label="البريد الإلكتروني">
-            <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className={inputCls} type="email" />
+            <input value={editForm.email} onChange={(e) => setEditForm(p => ({ ...p, email: e.target.value }))} className={inputCls} type="email" />
           </FormField>
           <FormField label="المدينة">
-            <select className={selectCls} defaultValue={customer.city}>
-              {["الرياض", "جدة", "الدمام", "مكة المكرمة", "المدينة المنورة"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
+            <select value={editForm.city} onChange={(e) => setEditForm(p => ({ ...p, city: e.target.value }))} className={selectCls}>
+              <option value="">اختر المدينة...</option>
+              {egyptCities.map((city) => <option key={city} value={city}>{city}</option>)}
             </select>
+          </FormField>
+          <FormField label="العنوان (بدون المدينة)">
+            <input value={editForm.address} onChange={(e) => setEditForm(p => ({ ...p, address: e.target.value }))} className={inputCls} />
           </FormField>
         </div>
         <ModalFooter
           onClose={() => setShowEdit(false)}
-          onConfirm={() => {
-            setShowEdit(false);
-            toast.success("تم تحديث بيانات العميل بنجاح");
-          }}
+          onConfirm={handleSaveEdit}
           confirmLabel="حفظ التعديلات"
+          loading={saving}
         />
       </Modal>
     </div>

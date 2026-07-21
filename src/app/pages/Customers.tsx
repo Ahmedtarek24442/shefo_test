@@ -4,19 +4,9 @@ import { Search, Plus, Phone, MapPin, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, FormField, ModalFooter, inputCls, selectCls } from "../components/Modal";
 import api from "../../services/api";
+import { egyptCities } from "../../data/egyptCities";
 
-const initialCustomers = [
-  { id: "C001", name: "شركة الفهد التجارية", contact: "عبدالله الفهد", phone: "٠٥٠-١٢٣-٤٥٦٧", city: "الرياض", orders: 45, revenue: "٤٥٠,٠٠٠", lastOrder: "٢٥/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C002", name: "مؤسسة النور للتغليف", contact: "خالد النور", phone: "٠٥٥-٢٣٤-٥٦٧٨", city: "جدة", orders: 38, revenue: "٣٨٠,٠٠٠", lastOrder: "٢٤/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C003", name: "شركة الأمل الصناعية", contact: "سعد الأمل", phone: "٠٥٦-٣٤٥-٦٧٨٩", city: "الدمام", orders: 32, revenue: "٣٢٠,٠٠٠", lastOrder: "٢٤/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C004", name: "مصنع الجودة للكرتون", contact: "فيصل الجودة", phone: "٠٥٠-٤٥٦-٧٨٩٠", city: "الرياض", orders: 28, revenue: "٢٨٠,٠٠٠", lastOrder: "٢٣/٠٦/٢٠٢٤", status: "متأخر" },
-  { id: "C005", name: "شركة التميز التجارية", contact: "محمد التميز", phone: "٠٥٥-٥٦٧-٨٩٠١", city: "مكة المكرمة", orders: 25, revenue: "٢٥٠,٠٠٠", lastOrder: "٢٣/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C006", name: "شركة الريادة للأغذية", contact: "عمر الريادة", phone: "٠٥٦-٦٧٨-٩٠١٢", city: "الرياض", orders: 22, revenue: "٢٢٠,٠٠٠", lastOrder: "٢٢/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C007", name: "مؤسسة الخليج للتصدير", contact: "ناصر الخليج", phone: "٠٥٠-٧٨٩-٠١٢٣", city: "الدمام", orders: 19, revenue: "١٩٠,٠٠٠", lastOrder: "٢٢/٠٦/٢٠٢٤", status: "نشط" },
-  { id: "C008", name: "شركة البناء الوطنية", contact: "إبراهيم البناء", phone: "٠٥٥-٨٩٠-١٢٣٤", city: "الرياض", orders: 15, revenue: "١٥٠,٠٠٠", lastOrder: "٢٠/٠٦/٢٠٢٤", status: "غير نشط" },
-];
-
-const emptyForm = { name: "", contact: "", phone: "", email: "", city: "", address: "", taxNo: "", creditLimit: "" };
+const emptyForm = { name: "", phone: "", email: "", city: "", address: "", taxNo: "", creditLimit: "" };
 
 export function Customers() {
   const navigate = useNavigate();
@@ -64,6 +54,7 @@ export function Customers() {
         address: form.address || form.city || null,
         taxNumber: form.taxNo || null,
         creditLimit: form.creditLimit ? parseFloat(form.creditLimit) : null,
+        responsibleId:2, // Defaulting to the initial admin user ID
       });
       setShowModal(false);
       setForm(emptyForm);
@@ -125,7 +116,7 @@ export function Customers() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
-              {["رقم العميل", "اسم الشركة", "جهة الاتصال", "الهاتف", "المدينة", "الطلبات", "الإيرادات", "آخر طلب", "الحالة", ""].map((h) => (
+              {["رقم العميل", "اسم الشركة", "الهاتف", "المدينة", "الطلبات", "الإيرادات", "آخر طلب", "الحالة", ""].map((h) => (
                 <th key={h} className="text-right py-3 px-4 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -139,7 +130,6 @@ export function Customers() {
               >
                 <td className="py-3 px-4 font-mono text-xs text-[#2563EB] font-bold">{c.id}</td>
                 <td className="py-3 px-4 font-semibold text-slate-800">{c.companyName}</td>
-                <td className="py-3 px-4 text-slate-600">{c.responsible?.name || "-"}</td>
                 <td className="py-3 px-4 text-slate-500 text-xs font-mono">
                   <div className="flex items-center gap-1">
                     <Phone className="w-3 h-3" />
@@ -190,9 +180,6 @@ export function Customers() {
             <FormField label="اسم الشركة" required>
               <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: شركة النجاح التجارية" className={inputCls} />
             </FormField>
-            <FormField label="الاسم / جهة الاتصال">
-              <input value={form.contact} onChange={(e) => set("contact", e.target.value)} placeholder="اسم المسؤول (اختياري)" className={inputCls} />
-            </FormField>
             <FormField label="رقم الهاتف" required>
               <input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="٠٥٠-XXX-XXXX" className={inputCls} />
             </FormField>
@@ -202,7 +189,7 @@ export function Customers() {
             <FormField label="المدينة">
               <select value={form.city} onChange={(e) => set("city", e.target.value)} className={selectCls}>
                 <option value="">اختر المدينة...</option>
-                {["الرياض", "جدة", "الدمام", "مكة المكرمة", "المدينة المنورة", "الخبر", "أبها", "تبوك"].map((c) => <option key={c}>{c}</option>)}
+                {egyptCities.map((city) => <option key={city} value={city}>{city}</option>)}
               </select>
             </FormField>
             <FormField label="الرقم الضريبي">
